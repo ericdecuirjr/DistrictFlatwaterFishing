@@ -1,0 +1,7 @@
+name = "district-flatwater-gemini"
+main = "index.js"
+compatibility_date = "2026-11-03"
+
+[vars]
+# Change this to the origin hosting the app. Origin means domain only, without the repo path.
+ALLOWED_ORIGIN = "https://ericdecuirjr.github.io"
