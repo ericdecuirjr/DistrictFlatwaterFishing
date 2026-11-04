@@ -30,10 +30,10 @@ for(const [density,size] of Object.entries(adaptive)){
 }
 const adaptiveDir=join(root,'mipmap-anydpi-v26');
 mkdirSync(adaptiveDir,{recursive:true});
-const xml='<?xml version="1.0" encoding="utf-8"?>\n<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n  <background android:drawable="@color/ic_launcher_background"/>\n  <foreground android:drawable="@mipmap/ic_launcher_foreground"/>\n</adaptive-icon>\n';
+const xml='<?xml version="1.0" encoding="utf-8"?>\n<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n  <background android:drawable="@drawable/df_brand_icon_background"/>\n  <foreground android:drawable="@mipmap/ic_launcher_foreground"/>\n</adaptive-icon>\n';
 writeFileSync(join(adaptiveDir,'ic_launcher.xml'),xml);
 writeFileSync(join(adaptiveDir,'ic_launcher_round.xml'),xml);
-const values=join(root,'values');
-mkdirSync(values,{recursive:true});
-writeFileSync(join(values,'df_brand_launcher_background.xml'),'<?xml version="1.0" encoding="utf-8"?>\n<resources><color name="ic_launcher_background">#00380e</color></resources>\n');
+const drawable=join(root,'drawable');
+mkdirSync(drawable,{recursive:true});
+writeFileSync(join(drawable,'df_brand_icon_background.xml'),'<?xml version="1.0" encoding="utf-8"?>\\n<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle"><solid android:color="#00380e"/></shape>\\n');
 console.log('Generated branded Android launcher assets from branding-logo.svg');
