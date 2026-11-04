@@ -35,5 +35,5 @@ writeFileSync(join(adaptiveDir,'ic_launcher.xml'),xml);
 writeFileSync(join(adaptiveDir,'ic_launcher_round.xml'),xml);
 const drawable=join(root,'drawable');
 mkdirSync(drawable,{recursive:true});
-writeFileSync(join(drawable,'df_brand_icon_background.xml'),'<?xml version="1.0" encoding="utf-8"?>\\n<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle"><solid android:color="#00380e"/></shape>\\n');
+writeFileSync(join(drawable,'df_brand_icon_background.xml'),'<?xml version="1.0" encoding="utf-8"?>\n<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle"><solid android:color="#00380e"/></shape>\n');
 console.log('Generated branded Android launcher assets from branding-logo.svg');
