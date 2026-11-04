@@ -97,4 +97,6 @@ assert.ok(currentPhase.includes("filter.value=''"),'Stale species filter is rese
 assert.ok(currentPhase.includes("if(!$('screen-map').hidden)renderLocations()"),'Visible map is rerendered immediately');
 assert.ok(currentPhase.includes("++refreshSequence;"),'Pending stale reads are invalidated on committed catch event');
 assert.ok(currentPhase.includes('df-map-live-status'),'Map shows live synchronization status');
+assert.ok(currentPhase.includes("const list=el('div','df-map-list');list.id='df-map-list';"),'Map location-list element must have the ID used by renderLocations');
+assert.ok(currentPhase.includes("const list=$('df-map-list'),status=$('df-map-status');"),'Location rendering uses the registered DOM list');
 console.log('Live save→map reconciliation, stale filter, pin move/delete tests passed');
