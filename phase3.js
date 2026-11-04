@@ -43,6 +43,7 @@ root.append(chart('Time of day',counts(catches,c=>{const d=new Date(c.capturedAt
 const ranges=[['Below 29.80',0],['29.80–29.99',0],['30.00–30.19',0],['30.20 and above',0]];for(const c of pressure){const x=c.weather.surfaceHpa*0.0295299830714;ranges[x<29.8?0:x<30?1:x<30.2?2:3][1]++;}root.append(chart('Catches by surface pressure (inHg)',ranges));root.append(el('p','df-analysis-note','Charts count logged catches only. They do not establish that particular times, weather conditions, or pressure readings cause fish to bite. Weather values are model estimates.'));
 }
 function filteredLocations(){return window.DistrictFlatwaterMapUtils.locations(catches,($('df-map-search')?.value||'').trim());}
+function canLoadMap(){return !!window.DistrictFlatwaterNative||navigator.onLine;}
 function renderLocations(){
  const list=$('df-map-list'),status=$('df-map-status');
  if(!list||!status)return;
@@ -195,7 +196,7 @@ function init(){
        if(map){invalidateMap();return;}
        // Opening Map is an explicit request to view map tiles and saved pins.
        // No live phone GPS is ever requested by this feature.
-       if(filteredLocations().length&&navigator.onLine&&!loadingMap)loadMap();
+       if(filteredLocations().length&&canLoadMap()&&!loadingMap)loadMap();
      });
    }
  });
@@ -205,7 +206,7 @@ function init(){
    refresh().then(current=>{
      if(!current||$('screen-map').hidden)return;
      if(map){invalidateMap();return;}
-     if(filteredLocations().length&&navigator.onLine&&!loadingMap)loadMap();
+     if(filteredLocations().length&&canLoadMap()&&!loadingMap)loadMap();
    });
  });
  window.addEventListener('focus',()=>{if(window.__DF_CATCH_APP_BOOT?.initialized)refresh();});
