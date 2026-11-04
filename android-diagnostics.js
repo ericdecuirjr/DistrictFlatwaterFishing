@@ -88,7 +88,7 @@
     const banner=document.createElement('section');
     banner.id='df-apk-diagnostic-panel';
     banner.setAttribute('aria-label','Android APK diagnostic checks');
-    banner.style.cssText='margin:12px auto 4px;padding:14px;max-width:960px;border:2px solid #c7a350;border-radius:14px;background:#fff8e6;color:#24402e;font:14px system-ui, sans-serif;';
+    banner.style.cssText='margin:0 0 15px;padding:14px;border:1px solid #dfe8dd;border-radius:14px;background:#fff;color:#24402e;font:14px system-ui, sans-serif;';
     const title=document.createElement('strong');
     title.textContent='Android APK Diagnostics';
     const explanation=document.createElement('p');
@@ -107,7 +107,9 @@
     out.textContent='No tests run yet. Your catches are not accessed by this diagnostic.';
     run.addEventListener('click',diagnose);
     controls.append(run,copy);banner.append(title,explanation,controls,out);
-    document.body.prepend(banner);
+    const slot=getId('df-diagnostics-slot');
+    if(slot)slot.append(banner);
+    else document.body.append(banner);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',insert);
   else insert();
