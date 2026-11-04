@@ -2,7 +2,16 @@ import {cpSync,existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {build} from 'esbuild';
 import sharp from 'sharp';
 const out='www';mkdirSync(out,{recursive:true});
-for(const file of ['index.html','app.js','styles.css','phase3.js','phase3.css','sw.js','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','android-diagnostics.js','photo-metadata.js','historical-weather.js','branding-logo.svg','gps-coordinates.js','splash.js']){
+// Local Leaflet assets keep map controls and markers reliable inside Android WebView.
+// Base map tiles still require an internet connection.
+mkdirSync(out+'/vendor',{recursive:true});
+for(const file of ['leaflet.js','leaflet.css']){
+ const source='node_modules/leaflet/dist/'+file;
+ if(!existsSync(source))throw Error('Missing Leaflet asset '+source);
+ cpSync(source,out+'/vendor/'+file);
+}
+cpSync('node_modules/leaflet/LICENSE',out+'/vendor/leaflet-LICENSE.txt');
+for(const file of ['index.html','app.js','styles.css','phase3.js','phase3.css','sw.js','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','android-diagnostics.js','photo-metadata.js','historical-weather.js','branding-logo.svg','map-utils.js','gps-coordinates.js','splash.js']){
  if(!existsSync(file))throw Error('Missing '+file);
  cpSync(file,out+'/'+file);
 }
