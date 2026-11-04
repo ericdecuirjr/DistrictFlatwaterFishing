@@ -29,7 +29,10 @@ assert.equal(groups.length,3);
 assert.equal(groups.find(g=>g.latitude===38.8895)?.items.length,2);
 assert.ok(groups.some(g=>g.latitude===0&&g.longitude===0));
 const phase=readFileSync('phase3.js','utf8');
-assert.ok(phase.includes("event.detail?.name==='map'){refresh();invalidateMap();}"),'Map tab must refresh catches before showing pins');
+assert.ok(phase.includes("event.detail?.name==='map'"),'Map tab handler exists');
+assert.ok(phase.includes("if(filteredLocations().length&&canLoadMap()&&!loadingMap)loadMap()"),'Entering Map auto-loads saved GPS pins when available');
+assert.ok(phase.includes("function canLoadMap(){return !!window.DistrictFlatwaterNative||navigator.onLine;}"),'Native map pin rendering can initialize offline');
+assert.ok(phase.includes('refreshSequence'),'Async catch list reloads reject outdated results');
 assert.ok(phase.includes('groupPins(filteredLocations())'),'Pins must be grouped from filtered GPS locations');
 assert.ok(phase.includes("'./vendor/leaflet.js'"),'Native build should use locally bundled Leaflet');
 assert.ok(phase.includes('invalidateSize'),'Hidden-to-visible map needs size refresh');
@@ -60,3 +63,14 @@ assert.ok(stage.includes('df-edit-catch'),'Map offers GPS correction via catch e
 assert.ok(logging.includes('reconcileEnteredGpsBeforeSave()'),'Save must reconcile manual GPS fields');
 assert.ok(logging.includes("document.addEventListener('df-edit-catch'"),'Map editor opens saved catch in app');
 console.log('Saved GPS provenance, map source isolation, and manual-entry safeguards passed');
+
+const saveLine=logging.match(/await putCatch\(record\);.{0,180}/)?.[0]||'';
+assert.ok(saveLine.includes("document.dispatchEvent(new CustomEvent('df-catches-changed'"),'Catch saved event must dispatch after IndexedDB transaction success');
+const deleteLine=logging.match(/await removeCatch\(id\);.{0,150}/)?.[0]||'';
+assert.ok(deleteLine.includes("document.dispatchEvent(new CustomEvent('df-catches-changed'"),'Delete should refresh map after transaction');
+assert.ok(stage.includes("document.addEventListener('df-catches-changed'"),'Map must subscribe to committed catch changes');
+assert.ok(!stage.includes("setTimeout(refresh,600"),'Map must not refresh on arbitrary Save-button timer');
+assert.ok(stage.includes('if(sequence!==refreshSequence)return false'),'Stale DB reads must not overwrite latest catch set');
+assert.ok(stage.includes('if(map)updateMarkers()'),'Existing map pins update without recreating map');
+assert.ok(stage.includes('if(map){invalidateMap();return;}'),'Map reuses already-loaded tiles and pins');
+console.log('Live map refresh on committed catches and map tab navigation passed');

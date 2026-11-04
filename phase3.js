@@ -8,6 +8,7 @@ const el=(tag,cls,value)=>{const node=document.createElement(tag);if(cls)node.cl
 const niceDate=iso=>{const d=new Date(iso);return Number.isNaN(d.valueOf())?'Unknown date':d.toLocaleDateString();};
 let catches=[],map=null,markers=null,loadingMap=false;
 let markerByKey=new Map();
+let refreshSequence=0;
 function readCatches(){if(!window.__DF_CATCH_APP_BOOT?.initialized)return Promise.resolve([]);return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;if(!db.objectStoreNames.contains(STORE)){db.close();resolve([]);return;}const tx=db.transaction(STORE,'readonly'),get=tx.objectStore(STORE).getAll();get.onsuccess=()=>resolve(get.result||[]);get.onerror=()=>reject(get.error);tx.oncomplete=()=>db.close();};});}
 function button(id,label,cls='button secondary'){const b=el('button',cls,label);b.id=id;b.type='button';return b;}
 function panel(title){const p=el('div','panel');p.append(el('h3','',title));return p;}
@@ -16,7 +17,25 @@ function screen(name,title,eyebrow){const s=el('section','screen');s.id='screen-
 function stat(grid,label,value){const box=el('div','df-kpi');box.append(el('strong','',value),el('span','',label));grid.append(box);}
 function chart(title,rows){const p=panel(title);if(!rows.length){p.append(el('div','df-empty','Log catches to see this chart.'));return p;}const max=Math.max(1,...rows.map(r=>r[1]));for(const [label,value] of rows){const line=el('div','df-chart-row'),cap=el('div','df-chart-label');cap.append(el('span','',label),el('strong','',value));const track=el('div','df-chart-track'),fill=el('div','df-chart-fill');fill.style.width=(value/max*100).toFixed(1)+'%';track.append(fill);line.append(cap,track);p.append(line);}return p;}
 function counts(data,keyFn){const m=new Map();for(const item of data){const key=keyFn(item);if(key!==null&&key!==undefined&&key!=='')m.set(key,(m.get(key)||0)+1);}return [...m].sort((a,b)=>b[1]-a[1]);}
-async function refresh(){try{catches=await readCatches();}catch(e){console.error('Unable to read catch log',e);const status=$('df-map-status');if(status)status.textContent='Unable to read saved catches: '+e.message;return;}if(!$('screen-analytics').hidden)renderAnalytics();if(!$('screen-map').hidden)renderLocations();}
+async function refresh(){
+ const sequence=++refreshSequence;
+ let rows;
+ try{rows=await readCatches();}
+ catch(e){
+  if(sequence===refreshSequence){
+   console.error('Unable to read catch log',e);
+   const status=$('df-map-status');
+   if(status)status.textContent='Unable to read saved catches: '+e.message;
+  }
+  return false;
+ }
+ // Prevent an older async IndexedDB read from overwriting newer saved catches.
+ if(sequence!==refreshSequence)return false;
+ catches=rows;
+ if(!$('screen-analytics').hidden)renderAnalytics();
+ if(!$('screen-map').hidden)renderLocations();
+ return true;
+}
 function renderAnalytics(){const root=$('df-analytics-data');if(!root)return;root.replaceChildren();const grid=el('div','df-kpi-grid'),geo=catches.filter(c=>Number.isFinite(c.latitude)&&Number.isFinite(c.longitude)),pressure=catches.filter(c=>Number.isFinite(c.weather?.surfaceHpa));const species=counts(catches,c=>String(c.species||'').trim().toLowerCase());const months=counts(catches,c=>{const d=new Date(c.capturedAt);return Number.isNaN(d.getTime())?null:d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');});stat(grid,'Total catches',catches.length);stat(grid,'Unique species',species.length);stat(grid,'GPS-tagged catches',geo.length);stat(grid,'Weather records',catches.filter(c=>c.weather).length);stat(grid,'Average surface pressure',pressure.length?(pressure.reduce((sum,c)=>sum+c.weather.surfaceHpa,0)/pressure.length*0.0295299830714).toFixed(2)+' inHg':'—');stat(grid,'Most recent catch',catches.length?niceDate([...catches].sort((a,b)=>Date.parse(b.capturedAt)-Date.parse(a.capturedAt))[0].capturedAt):'—');root.append(grid);
 root.append(chart('Most caught species',counts(catches,c=>String(c.species||'Unknown').trim()||'Unknown').slice(0,12)));
 root.append(chart('Catches by month',months.sort((a,b)=>a[0].localeCompare(b[0])).slice(-12)));
@@ -24,6 +43,7 @@ root.append(chart('Time of day',counts(catches,c=>{const d=new Date(c.capturedAt
 const ranges=[['Below 29.80',0],['29.80–29.99',0],['30.00–30.19',0],['30.20 and above',0]];for(const c of pressure){const x=c.weather.surfaceHpa*0.0295299830714;ranges[x<29.8?0:x<30?1:x<30.2?2:3][1]++;}root.append(chart('Catches by surface pressure (inHg)',ranges));root.append(el('p','df-analysis-note','Charts count logged catches only. They do not establish that particular times, weather conditions, or pressure readings cause fish to bite. Weather values are model estimates.'));
 }
 function filteredLocations(){return window.DistrictFlatwaterMapUtils.locations(catches,($('df-map-search')?.value||'').trim());}
+function canLoadMap(){return !!window.DistrictFlatwaterNative||navigator.onLine;}
 function renderLocations(){
  const list=$('df-map-list'),status=$('df-map-status');
  if(!list||!status)return;
@@ -129,6 +149,8 @@ async function loadMap(){
    await addScript(local?'./vendor/leaflet.js':'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
   }
   if(!window.L)throw Error('Map library did not initialize');
+  // Fetch the committed records before deciding where to create the map.
+  await refresh();
   const selected=window.DistrictFlatwaterMapUtils.groupPins(filteredLocations());
   if(!selected.length){
     $('df-map-status').textContent='No saved GPS pins to plot. The map does not substitute the phone location.';
@@ -141,7 +163,6 @@ async function loadMap(){
    .on('tileerror',()=>{if(++failures===2)$('df-map-status').textContent='Background map tiles unavailable. Saved GPS pins remain positioned; check internet access.';})
    .addTo(map);
   b.hidden=true;
-  await refresh();
   updateMarkers();invalidateMap();
  }catch(e){
   $('df-map-status').textContent='Unable to display map: '+e.message+'. Saved fishing locations remain listed below.';
@@ -153,7 +174,7 @@ function init(){
  const analytics=screen('analytics','Catch analytics','FISHING PATTERNS'),locations=screen('map','Fishing locations','YOUR WATER');
  const data=el('div');data.id='df-analytics-data';analytics.append(data);
  const mp=panel('Catch map');
- mp.append(el('p','df-privacy','The map is loaded on request. Its tiles are requested from OpenStreetMap and can reveal the areas you view to the map provider. Your catch records are not uploaded as a database.'));
+ mp.append(el('p','df-privacy','Opening the Map tab loads map tiles when online. Tiles come from OpenStreetMap and can reveal the area shown to the provider. Your catch database and photos are not uploaded.'));
  const provenance=el('p','df-privacy');provenance.id='df-map-source-note';
  provenance.textContent='Only coordinates in saved catch records are used for map pins. Current phone GPS is never read from the Map screen.';
  mp.append(provenance);
@@ -169,10 +190,25 @@ function init(){
  const reload=button('df-refresh-map','Refresh saved locations','button secondary compact');reload.addEventListener('click',refresh);search.append(reload);
  document.addEventListener('df-tab-change',event=>{
    if(event.detail?.name==='analytics')renderAnalytics();
-   if(event.detail?.name==='map'){refresh();invalidateMap();}
+   if(event.detail?.name==='map'){
+     refresh().then(current=>{
+       if(!current)return;
+       if(map){invalidateMap();return;}
+       // Opening Map is an explicit request to view map tiles and saved pins.
+       // No live phone GPS is ever requested by this feature.
+       if(filteredLocations().length&&canLoadMap()&&!loadingMap)loadMap();
+     });
+   }
  });
  $('tab-gallery')?.addEventListener('click',refresh);
- $('save-btn')?.addEventListener('click',()=>setTimeout(refresh,600));
+ document.addEventListener('df-catches-changed',()=>{
+   // Emitted only after a successful IndexedDB transaction, never on button click.
+   refresh().then(current=>{
+     if(!current||$('screen-map').hidden)return;
+     if(map){invalidateMap();return;}
+     if(filteredLocations().length&&canLoadMap()&&!loadingMap)loadMap();
+   });
+ });
  window.addEventListener('focus',()=>{if(window.__DF_CATCH_APP_BOOT?.initialized)refresh();});
  if(window.__DF_CATCH_APP_BOOT?.initialized)refresh();
  else document.addEventListener('df-catch-ready',refresh,{once:true});
