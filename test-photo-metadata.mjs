@@ -38,7 +38,7 @@ function jpegFixture(){
   t[58+8]='N'.charCodeAt(0);t[58+9]=0;
   t[82+8]='W'.charCodeAt(0);t[82+9]=0;
   const len=t.length+8;
-  const jpeg=new Uint8Array(len+4);
+  const jpeg=new Uint8Array(len+6);
   jpeg.set([255,216,255,225,len>>8,len&255,69,120,105,102,0,0],0);
   jpeg.set(t,12);
   jpeg.set([255,217],12+t.length);
