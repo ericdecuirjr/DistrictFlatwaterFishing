@@ -13,7 +13,8 @@
     "@capacitor/share": "8.0.1",
     "@capacitor/geolocation": "8.2.4",
     "@capacitor/camera": "8.1.0",
-    "sharp": "^0.34.4"
+    "sharp": "^0.34.4",
+    "leaflet": "1.9.4"
   },
   "devDependencies": {
     "@capacitor/cli": "8.5.3",
