@@ -1,0 +1,11 @@
+{
+  "appId": "com.districtflatwater.fishing",
+  "appName": "District Flatwater Fishing",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
