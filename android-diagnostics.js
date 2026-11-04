@@ -70,6 +70,8 @@
       textResult(!!getId('photo-preview'),'Catch log user interface');
       const boot=window.__DF_CATCH_APP_BOOT;
       textResult(!!boot?.initialized,'Catch app initialized',boot?.storageError||('main app version '+(boot?.version||'unknown')));
+      if(boot?.databaseVersion)textResult(true,'Catch database opened','schema version '+boot.databaseVersion+(boot.databaseRepair?' · missing store repaired':''));
+      if(boot?.storageWarning)textResult(false,'Catch database upgrade blocked',boot.storageWarning);
       textResult(typeof getId('version')?.textContent==='string','Main app version',getId('version')?.textContent||'not shown');
       if(typeof indexedDB!=='undefined')await probeDb();
       await probeNetwork();

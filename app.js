@@ -2,10 +2,10 @@
 (function districtFlatwaterCatchApp(){
 'use strict';
 if(window.__DF_CATCH_APP_BOOT) return;
-window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.1.2'};
+window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.1.3'};
 /* District Flatwater Fishing — Phase 1. No frameworks or tracking. */
 'use strict';
-const VERSION = '3.1.2';
+const VERSION = '3.1.3';
 const DB_NAME = 'district-flatwater-catches-v1';
 const STORE = 'catches';
 const nativeBridge = () => window.DistrictFlatwaterNative;
@@ -18,7 +18,54 @@ function nowLocal(iso){const d=new Date(iso);const shift=d.getTimezoneOffset()*6
 function localToIso(str){const d=new Date(str);return Number.isNaN(d.getTime())?null:d.toISOString();}
 function prettyDate(iso){const d=new Date(iso);return Number.isNaN(d.getTime())?'Unknown date':d.toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});}
 function shortDate(iso){const d=new Date(iso);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString(undefined,{month:'short',day:'numeric'});}
-function openDb(){return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,1);request.onupgradeneeded=()=>{const store=request.result.createObjectStore(STORE,{keyPath:'id'});store.createIndex('capturedAt','capturedAt');store.createIndex('species','species');};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+/* Open without pinning version 1: prior native builds could create an empty
+   IndexedDB database before the catch store existed. A version upgrade adds
+   the missing store WITHOUT deleting the database or any other object stores. */
+function openDb(){
+  return new Promise((resolve,reject)=>{
+    const boot=window.__DF_CATCH_APP_BOOT||{};
+    function ensureStore(request){
+      const database=request.result;
+      let store;
+      if(!database.objectStoreNames.contains(STORE)){
+        store=database.createObjectStore(STORE,{keyPath:'id'});
+      }else{
+        store=request.transaction.objectStore(STORE);
+      }
+      if(!store.indexNames.contains('capturedAt'))store.createIndex('capturedAt','capturedAt');
+      if(!store.indexNames.contains('species'))store.createIndex('species','species');
+    }
+    function finish(request,wasRepair){
+      const database=request.result;
+      if(!database.objectStoreNames.contains(STORE)){
+        database.close();
+        reject(Error('Catch storage setup did not create the catches store.'));
+        return;
+      }
+      database.onversionchange=()=>database.close();
+      boot.databaseVersion=database.version;
+      if(wasRepair)boot.databaseRepair='Created missing catches store without clearing other storage.';
+      resolve(database);
+    }
+    const request=indexedDB.open(DB_NAME);
+    request.onupgradeneeded=()=>ensureStore(request);
+    request.onerror=()=>reject(request.error||Error('Cannot open catch database.'));
+    request.onsuccess=()=>{
+      const database=request.result;
+      if(database.objectStoreNames.contains(STORE)){
+        finish(request,false);
+        return;
+      }
+      const nextVersion=database.version+1;
+      database.close();
+      const repair=indexedDB.open(DB_NAME,nextVersion);
+      repair.onupgradeneeded=()=>ensureStore(repair);
+      repair.onerror=()=>reject(repair.error||Error('Could not repair missing catch storage.'));
+      repair.onblocked=()=>{boot.storageWarning='Close other fishing app windows to finish a safe storage upgrade.';};
+      repair.onsuccess=()=>finish(repair,true);
+    };
+  });
+}
 function getAll(){return new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readonly').objectStore(STORE).getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 function getOne(id){return new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readonly').objectStore(STORE).get(id);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 function putCatch(record){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(record);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
@@ -93,7 +140,7 @@ function dataUrlToBlob(uri){const match=/^data:(image\/(?:jpeg|png|webp));base64
 async function importBackup(file){if(!file)return;if(file.size>120*1024*1024){notify('Backup too large for this import. Split your archive.',true);return;}try{const data=JSON.parse(await file.text());if(data.application!=='district-flatwater-fishing'||data.formatVersion!==1||!Array.isArray(data.catches))throw Error('Unsupported District Flatwater backup format');if(data.catches.length>2000)throw Error('Too many catches in one import');let count=0;for(const c of data.catches){if(typeof c.id!=='string'||typeof c.species!=='string'||typeof c.capturedAt!=='string'||!c.photoDataUrl||!Number.isFinite(Date.parse(c.capturedAt)))throw Error('Backup contains an invalid catch');const {photoDataUrl,...record}=c;record.photo=dataUrlToBlob(photoDataUrl);record.species=record.species.slice(0,100);await putCatch(record);count++;}await refreshStats();notify(`Imported ${count} catches.`);tab('gallery');}catch(e){notify('Import failed: '+e.message,true);}finally{$('import-file').value='';}}
 function saveProxy(){const value=$('proxy-url').value.trim().replace(/\/$/,'');if(value){let u;try{u=new URL(value);}catch(_){notify('Enter a valid HTTPS service URL.',true);return;}if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash){notify('Use only the HTTPS service base URL (no password or query).',true);return;}localStorage.setItem('df-gemini-proxy',u.href.replace(/\/$/,''));}else localStorage.removeItem('df-gemini-proxy');notify(value?'Gemini service URL saved.':'Gemini service URL cleared.');}
 async function init(){try{db=await openDb();}catch(e){window.__DF_CATCH_APP_BOOT.storageError=String(e?.message||e);notify('Storage unavailable. Check private browsing settings.',true);return;}$('version').textContent=VERSION;resetForm();showNetwork();$('proxy-url').value=configuredProxy();for(const button of document.querySelectorAll('[data-tab]'))button.addEventListener('click',()=>tab(button.dataset.tab));$('new-from-gallery').addEventListener('click',()=>{resetForm();tab('log');});$('take-photo').addEventListener('click',async()=>{if(!nativeBridge()?.pickPhoto){$('camera-input').click();return;}try{await selectPhoto(await nativeBridge().pickPhoto('camera'));}catch(e){notify('Camera: '+(e?.message||String(e)),true);}});
-$('choose-photo').addEventListener('click',async()=>{if(!nativeBridge()?.pickPhoto){$('upload-input').click();return;}try{await selectPhoto(await nativeBridge().pickPhoto('gallery'));}catch(e){notify('Photo selection: '+(e?.message||String(e)),true);}});$('camera-input').addEventListener('change',e=>{selectPhoto(e.target.files[0]);e.target.value='';});$('upload-input').addEventListener('change',e=>{selectPhoto(e.target.files[0]);e.target.value='';});$('location-btn').addEventListener('click',captureLocation);$('weather-btn').addEventListener('click',()=>fetchWeather());$('identify-btn').addEventListener('click',identify);$('save-btn').addEventListener('click',saveCatch);$('cancel-edit').addEventListener('click',()=>{resetForm();tab('gallery');});$('species-filter').addEventListener('change',renderGallery);$('sort-by').addEventListener('change',renderGallery);$('save-proxy').addEventListener('click',saveProxy);$('export-btn').addEventListener('click',exportBackup);$('import-btn').addEventListener('click',()=>$('import-file').click());$('import-file').addEventListener('change',e=>importBackup(e.target.files[0]));window.addEventListener('online',showNetwork);window.addEventListener('offline',showNetwork);await refreshStats();window.__DF_CATCH_APP_BOOT.initialized=true;if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+$('choose-photo').addEventListener('click',async()=>{if(!nativeBridge()?.pickPhoto){$('upload-input').click();return;}try{await selectPhoto(await nativeBridge().pickPhoto('gallery'));}catch(e){notify('Photo selection: '+(e?.message||String(e)),true);}});$('camera-input').addEventListener('change',e=>{selectPhoto(e.target.files[0]);e.target.value='';});$('upload-input').addEventListener('change',e=>{selectPhoto(e.target.files[0]);e.target.value='';});$('location-btn').addEventListener('click',captureLocation);$('weather-btn').addEventListener('click',()=>fetchWeather());$('identify-btn').addEventListener('click',identify);$('save-btn').addEventListener('click',saveCatch);$('cancel-edit').addEventListener('click',()=>{resetForm();tab('gallery');});$('species-filter').addEventListener('change',renderGallery);$('sort-by').addEventListener('change',renderGallery);$('save-proxy').addEventListener('click',saveProxy);$('export-btn').addEventListener('click',exportBackup);$('import-btn').addEventListener('click',()=>$('import-file').click());$('import-file').addEventListener('change',e=>importBackup(e.target.files[0]));window.addEventListener('online',showNetwork);window.addEventListener('offline',showNetwork);await refreshStats();window.__DF_CATCH_APP_BOOT.initialized=true;document.dispatchEvent(new Event('df-catch-ready'));if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 document.addEventListener('DOMContentLoaded',init);
 
 })();
