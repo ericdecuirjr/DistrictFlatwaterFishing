@@ -11,8 +11,7 @@ function readCatches(){if(!window.__DF_CATCH_APP_BOOT?.initialized)return Promis
 function button(id,label,cls='button secondary'){const b=el('button',cls,label);b.id=id;b.type='button';return b;}
 function panel(title){const p=el('div','panel');p.append(el('h3','',title));return p;}
 function screen(name,title,eyebrow){const s=el('section','screen');s.id='screen-'+name;s.hidden=true;const head=el('div','section-title'),inner=el('div');inner.append(el('div','eyebrow',eyebrow),el('h2','',title));head.append(inner);s.append(head);return s;}
-function show(name){document.querySelectorAll('main > .screen').forEach(s=>s.hidden=s.id!=='screen-'+name);document.querySelectorAll('.tabs .tab').forEach(b=>{const active=b.dataset.tab===name;b.classList.toggle('active',active);if(active)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});if(name==='analytics')renderAnalytics();if(name==='map')renderLocations();window.scrollTo({top:0,behavior:'smooth'});}
-function addTab(name,label){const b=button('tab-'+name,label,'tab');b.dataset.tab=name;b.addEventListener('click',()=>show(name));return b;}
+/* Navigation is centralized by app.js; this module reacts to navigation events. */
 function stat(grid,label,value){const box=el('div','df-kpi');box.append(el('strong','',value),el('span','',label));grid.append(box);}
 function chart(title,rows){const p=panel(title);if(!rows.length){p.append(el('div','df-empty','Log catches to see this chart.'));return p;}const max=Math.max(1,...rows.map(r=>r[1]));for(const [label,value] of rows){const line=el('div','df-chart-row'),cap=el('div','df-chart-label');cap.append(el('span','',label),el('strong','',value));const track=el('div','df-chart-track'),fill=el('div','df-chart-fill');fill.style.width=(value/max*100).toFixed(1)+'%';track.append(fill);line.append(cap,track);p.append(line);}return p;}
 function counts(data,keyFn){const m=new Map();for(const item of data){const key=keyFn(item);if(key!==null&&key!==undefined&&key!=='')m.set(key,(m.get(key)||0)+1);}return [...m].sort((a,b)=>b[1]-a[1]);}
@@ -29,6 +28,30 @@ function addStyle(url){return new Promise((resolve,reject)=>{const tag=el('link'
 function addScript(url){return new Promise((resolve,reject)=>{const tag=el('script');tag.src=url;tag.onload=resolve;tag.onerror=reject;document.head.append(tag);});}
 function updateMarkers(){if(!map||!window.L)return;if(markers)map.removeLayer(markers);const rows=filteredLocations().slice(0,1000);markers=L.featureGroup(rows.map(c=>{const m=L.marker([c.latitude,c.longitude]),popup=el('div');popup.append(el('strong','',c.species||'Catch'),el('div','',niceDate(c.capturedAt)));m.bindPopup(popup);return m;})).addTo(map);if(rows.length)map.fitBounds(markers.getBounds().pad(.18),{maxZoom:13});}
 async function loadMap(){if(loadingMap||map)return;loadingMap=true;const b=$('df-load-map');b.disabled=true;b.textContent='Loading map...';try{if(!navigator.onLine)throw Error('Internet connection needed to load map tiles');await addStyle('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');await addScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');map=L.map('df-map',{scrollWheelZoom:false}).setView([39.3,-76.6],8);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);updateMarkers();setTimeout(()=>map.invalidateSize(),150);b.hidden=true;}catch(e){$('df-map-status').textContent='Unable to load map: '+e.message;b.disabled=false;b.textContent='Try loading map again';}finally{loadingMap=false;}}
-function init(){const nav=document.querySelector('.tabs'),main=document.querySelector('main');if(!nav||!main)return;const analytics=screen('analytics','Catch analytics','FISHING PATTERNS'),locations=screen('map','Fishing locations','YOUR WATER');const data=el('div');data.id='df-analytics-data';analytics.append(data);const mp=panel('Catch map');mp.append(el('p','df-privacy','The map is loaded on request. Its tiles are requested from OpenStreetMap and can reveal the areas you view to the map provider. Your catch records are not uploaded as a database.'));mp.append(button('df-load-map','Load interactive map'));const m=el('div');m.id='df-map';mp.append(m);const status=el('div');status.id='df-map-status';mp.append(status);locations.append(mp);const search=panel('Saved fishing locations'),label=el('label','','Filter by species'),input=el('input');label.htmlFor='df-map-search';input.id='df-map-search';input.placeholder='e.g. Largemouth bass';const list=el('div','df-map-list');search.append(label,input,list);locations.append(search);nav.append(addTab('analytics','▥ Analytics'),addTab('map','◎ Map'));main.insertBefore(analytics,$('screen-settings'));main.insertBefore(locations,$('screen-settings'));$('df-load-map').addEventListener('click',loadMap);input.addEventListener('input',renderLocations);nav.querySelectorAll('[data-tab]:not(#tab-analytics):not(#tab-map)').forEach(b=>b.addEventListener('click',()=>{analytics.hidden=true;locations.hidden=true;}));$('tab-gallery')?.addEventListener('click',refresh);$('save-btn')?.addEventListener('click',()=>setTimeout(refresh,600));window.addEventListener('focus',()=>{if(window.__DF_CATCH_APP_BOOT?.initialized)refresh();});if(window.__DF_CATCH_APP_BOOT?.initialized){refresh();}else{document.addEventListener('df-catch-ready',refresh,{once:true});}}
+function init(){
+ const main=document.querySelector('main');if(!main)return;
+ const analytics=screen('analytics','Catch analytics','FISHING PATTERNS'),locations=screen('map','Fishing locations','YOUR WATER');
+ const data=el('div');data.id='df-analytics-data';analytics.append(data);
+ const mp=panel('Catch map');
+ mp.append(el('p','df-privacy','The map is loaded on request. Its tiles are requested from OpenStreetMap and can reveal the areas you view to the map provider. Your catch records are not uploaded as a database.'));
+ mp.append(button('df-load-map','Load interactive map'));
+ const m=el('div');m.id='df-map';mp.append(m);
+ const status=el('div');status.id='df-map-status';mp.append(status);locations.append(mp);
+ const search=panel('Saved fishing locations'),label=el('label','','Filter by species'),input=el('input');
+ label.htmlFor='df-map-search';input.id='df-map-search';input.placeholder='e.g. Largemouth bass';
+ const list=el('div','df-map-list');search.append(label,input,list);locations.append(search);
+ main.insertBefore(analytics,$('screen-settings'));main.insertBefore(locations,$('screen-settings'));
+ $('df-load-map').addEventListener('click',loadMap);
+ input.addEventListener('input',renderLocations);
+ document.addEventListener('df-tab-change',event=>{
+   if(event.detail?.name==='analytics')renderAnalytics();
+   if(event.detail?.name==='map'){renderLocations();if(map)window.setTimeout(()=>map.invalidateSize(),120);}
+ });
+ $('tab-gallery')?.addEventListener('click',refresh);
+ $('save-btn')?.addEventListener('click',()=>setTimeout(refresh,600));
+ window.addEventListener('focus',()=>{if(window.__DF_CATCH_APP_BOOT?.initialized)refresh();});
+ if(window.__DF_CATCH_APP_BOOT?.initialized)refresh();
+ else document.addEventListener('df-catch-ready',refresh,{once:true});
+}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
