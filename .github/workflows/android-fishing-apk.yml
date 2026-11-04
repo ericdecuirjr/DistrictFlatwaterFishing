@@ -34,6 +34,8 @@ jobs:
           node --check splash.js
           node --check test-gps-coordinates.mjs
           node test-gps-coordinates.mjs
+          node --check test-navigation.mjs
+          node test-navigation.mjs
           node --check app.js
           node --check photo-metadata.js
           node --check test-photo-metadata.mjs
