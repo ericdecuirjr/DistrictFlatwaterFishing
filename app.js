@@ -2,10 +2,10 @@
 (function districtFlatwaterCatchApp(){
 'use strict';
 if(window.__DF_CATCH_APP_BOOT) return;
-window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.6.1'};
+window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.7.0'};
 /* District Flatwater Fishing — Phase 1. No frameworks or tracking. */
 'use strict';
-const VERSION = '3.6.1';
+const VERSION = '3.7.0';
 const DB_NAME = 'district-flatwater-catches-v1';
 const STORE = 'catches';
 const nativeBridge = () => window.DistrictFlatwaterNative;
@@ -75,7 +75,7 @@ function tab(name){
   const requested=$('screen-'+name)?name:'log';
   const navName=['settings','diagnostics'].includes(requested)?'more':requested;
   document.querySelectorAll('main > .screen').forEach(screen=>{screen.hidden=screen.id!=='screen-'+requested;});
-  const intro=document.querySelector('main > .intro');if(intro)intro.hidden=requested!=='log';
+  // The branded banner now sits outside main and remains visible on every tab.
   document.querySelectorAll('#app-bottom-nav .bottom-nav-item').forEach(button=>{
     const active=button.dataset.tab===navName;
     button.classList.toggle('active',active);

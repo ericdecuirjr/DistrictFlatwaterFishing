@@ -87,3 +87,56 @@ footer{padding-bottom:18px}
  .bottom-nav-item{font-size:.65rem}
  .bottom-nav-item svg{width:21px;height:21px}
 }
+
+/* v3.7: the top branded banner is roughly 10% larger and remains visible on every tab.
+   Constrain it on Galaxy screens so the fixed lower menu and content remain usable. */
+.df-sticky-brand-shell{
+ position:sticky;top:0;z-index:105;
+ background:#00380e;
+ box-shadow:0 4px 16px #001f1329;
+}
+.df-sticky-brand-shell .masthead{
+ padding-top:10px;padding-bottom:10px;
+}
+.df-sticky-brand-shell .intro{
+ max-width:990px;margin:0 auto;border-radius:0;
+ padding:16px 33px;
+ grid-template-columns:minmax(0,1fr) minmax(140px,264px);
+ background:linear-gradient(125deg,#00380e 0%,#114b2b 58%,#073a20 100%);
+}
+.df-sticky-brand-shell .intro h1{font-size:clamp(1.8rem,5.5vw,3.02rem);margin:8px 0 7px}
+.df-sticky-brand-shell .intro .eyebrow{font-size:.715rem}
+.df-sticky-brand-shell .intro p{font-size:.96rem}
+.df-sticky-brand-shell .intro-emblem{width:min(100%,264px)}
+.df-sticky-brand-shell .intro .stats{margin-top:12px}
+.df-sticky-brand-shell .intro .stats strong{font-size:1.64rem}
+.df-sticky-brand-shell + main{padding-top:16px}
+@media(max-width:700px){
+ .df-sticky-brand-shell .masthead{padding:9px 15px}
+ .df-sticky-brand-shell .intro{
+  grid-template-columns:minmax(0,1fr) 112px;
+  padding:16px 18px;gap:12px;align-items:center;
+ }
+ .df-sticky-brand-shell .intro h1{font-size:clamp(1.5rem,5vw,1.95rem);margin:6px 0}
+ .df-sticky-brand-shell .intro .eyebrow{font-size:.68rem}
+ .df-sticky-brand-shell .intro p{display:none}
+ .df-sticky-brand-shell .intro-emblem{width:112px;grid-row:auto;justify-self:end}
+ .df-sticky-brand-shell .intro-copy{grid-row:auto;text-align:left}
+ .df-sticky-brand-shell .intro .stats{gap:12px;margin-top:9px;justify-content:start}
+ .df-sticky-brand-shell .intro .stats strong{font-size:1.18rem}
+ .df-sticky-brand-shell .intro .stats span{font-size:.65rem}
+}
+@media(max-width:410px){
+ .df-sticky-brand-shell .intro{grid-template-columns:minmax(0,1fr) 108px;gap:8px;padding:13px 12px}
+ .df-sticky-brand-shell .intro-emblem{width:108px;grid-row:auto;justify-self:end}
+ .df-sticky-brand-shell .intro-copy{grid-row:auto;text-align:left}
+ .df-sticky-brand-shell .intro h1{font-size:1.35rem}
+ .df-sticky-brand-shell .intro .eyebrow{font-size:.59rem}
+ .df-sticky-brand-shell .intro .stats{gap:10px}
+ .df-sticky-brand-shell .intro .stats strong{font-size:1.08rem}
+}
+@media(max-height:680px) and (max-width:700px){
+ .df-sticky-brand-shell .intro{padding-top:8px;padding-bottom:8px}
+ .df-sticky-brand-shell .intro h1{font-size:1.3rem}
+ .df-sticky-brand-shell .intro-emblem{max-width:88px}
+}

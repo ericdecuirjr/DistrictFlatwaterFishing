@@ -36,6 +36,8 @@ jobs:
           node test-gps-coordinates.mjs
           node --check test-navigation.mjs
           node test-navigation.mjs
+          node --check test-sticky-banner-splash.mjs
+          node test-sticky-banner-splash.mjs
           node --check app.js
           node --check photo-metadata.js
           node --check test-photo-metadata.mjs

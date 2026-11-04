@@ -1,0 +1,22 @@
+/* Guard that shared banner, fixed lower toolbar, and two-second splash coexist. */
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+const html=readFileSync('index.html','utf8');
+const app=readFileSync('app.js','utf8');
+const css=readFileSync('styles.css','utf8');
+const splash=readFileSync('splash.js','utf8');
+assert.ok(html.includes('<div class="df-sticky-brand-shell">'),'Missing sticky banner wrapper');
+assert.ok(html.includes('<section class="intro" aria-label="District Flatwater Fishing banner">'));
+const shell=html.split('<div class="df-sticky-brand-shell">')[1].split('</div>\n  <main>')[0];
+assert.ok(shell.includes('class="masthead"'));
+assert.ok(shell.includes('id="total-catches"'),'Catch counters must remain displayed');
+assert.ok(shell.includes('branding-logo.svg'),'Approved branded emblem must remain');
+assert.ok(html.indexOf('df-sticky-brand-shell') < html.indexOf('<main>'),'Banner should sit outside tab-switching screens');
+assert.ok(!app.includes("intro.hidden=requested!=='log'"),'Navigation must not hide banner');
+assert.ok(css.includes('position:sticky;top:0;z-index:105'),'Banner must remain sticky');
+assert.ok(css.includes('grid-template-columns:minmax(0,1fr) minmax(140px,264px)'),'Banner/logo about ten percent larger');
+assert.ok(html.includes('id="app-bottom-nav"'),'Fixed lower menu retained');
+assert.match(splash,/MIN_VISIBLE_MS=2000/);
+assert.match(splash,/MAX_VISIBLE_MS=5000/);
+assert.ok(splash.includes('df-catch-ready'),'Splash waits for app readiness');
+console.log('Sticky brand banner and 2-second splash source checks passed');
