@@ -1,7 +1,7 @@
 import {cpSync,existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {build} from 'esbuild';
 const out='www';mkdirSync(out,{recursive:true});
-for(const file of ['index.html','app.js','styles.css','phase3.js','phase3.css','sw.js','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','android-diagnostics.js']){
+for(const file of ['index.html','app.js','styles.css','phase3.js','phase3.css','sw.js','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','android-diagnostics.js','photo-metadata.js']){
  if(!existsSync(file))throw Error('Missing '+file);
  cpSync(file,out+'/'+file);
 }

@@ -27,6 +27,7 @@
       <button id="tab-log" class="tab active" data-tab="log" aria-current="page" type="button">＋ Log catch</button>
       <button id="tab-gallery" class="tab" data-tab="gallery" type="button">▦ Gallery</button>
       <button id="tab-settings" class="tab" data-tab="settings" type="button">⚙ Settings</button>
+      <button id="tab-diagnostics" class="tab" data-tab="diagnostics" type="button">🛠 Diagnostics</button>
     </nav>
     <section id="screen-log" class="screen" aria-labelledby="log-heading">
       <div class="section-title"><div><div class="eyebrow">NEW ENTRY</div><h2 id="log-heading">Log a catch</h2></div><small id="edit-label" hidden>Editing saved catch</small></div>
@@ -35,6 +36,15 @@
         <div class="photo-buttons"><button id="take-photo" class="button primary" type="button">📷 Take photo</button><button id="choose-photo" class="button secondary" type="button">＋ Choose photo</button></div>
         <input id="camera-input" type="file" accept="image/*" capture="environment" hidden />
         <input id="upload-input" type="file" accept="image/*" hidden />
+        <div id="metadata-panel" class="photo-metadata-panel" hidden>
+          <div class="panel-heading"><h3>Original photo metadata</h3><span class="pill">EXIF · optional</span></div>
+          <p id="metadata-summary" class="metadata-summary" role="status"></p>
+          <div id="metadata-actions" class="photo-buttons" hidden>
+            <button id="metadata-apply" class="button secondary" type="button">Use photo date &amp; GPS</button>
+            <button id="metadata-skip" class="button ghost" type="button">Keep phone values</button>
+          </div>
+          <p class="helper">Review photo metadata before applying it. It may be absent or inaccurate. Photo date and GPS are never applied automatically; original metadata is read locally.</p>
+        </div>
         <p class="helper">Photos stay on this device. They are sent to Gemini only if you tap “Identify with Gemini.”</p>
       </div>
       <div class="panel">
@@ -50,11 +60,11 @@
         <div class="panel-heading"><h3>Time, location & conditions</h3><span class="pill">Auto-capture</span></div>
         <label for="caught-at">Time logged</label>
         <input id="caught-at" type="datetime-local" />
-        <p class="helper">Defaults to the time you select the photograph, not the photo's original capture time.</p>
+        <p class="helper">Defaults to when the photo is selected unless you choose its original EXIF date. You can edit this field.</p>
         <div class="conditions"><div><span class="metric-label">GPS location</span><strong id="location-value">Not captured</strong></div><div><span class="metric-label">Temperature</span><strong id="temperature-value">—</strong></div><div><span class="metric-label">Barometric pressure</span><strong id="pressure-value">—</strong></div><div><span class="metric-label">Conditions</span><strong id="conditions-value">—</strong></div></div>
         <div id="forecast-value" class="forecast" hidden></div>
         <div class="photo-buttons"><button id="location-btn" class="button secondary" type="button">◎ Capture GPS & weather</button><button id="weather-btn" class="button ghost" type="button" disabled>↻ Refresh weather</button></div>
-        <p class="helper">Requires location permission and internet for weather. Pressure and temperature are estimated from weather data, not measured by your phone.</p>
+        <p class="helper">Capture GPS &amp; weather uses the phone's current location and current model conditions. For older photos, choose their EXIF location instead and use Refresh weather only if current conditions are appropriate. Pressure and temperature are model estimates.</p>
       </div>
       <div class="panel"><h3>Catch details <span class="optional">(optional)</span></h3><div class="two-col"><div><label for="length">Length (inches)</label><input id="length" type="number" min="0" max="200" step="0.1" inputmode="decimal" placeholder="—" /></div><div><label for="weight">Weight (pounds)</label><input id="weight" type="number" min="0" max="2000" step="0.01" inputmode="decimal" placeholder="—" /></div></div><label for="lure">Bait / lure</label><input id="lure" type="text" maxlength="120" placeholder="What worked?" /><label for="notes">Notes</label><textarea id="notes" rows="3" maxlength="1500" placeholder="Water conditions, technique, or a good story..."></textarea></div>
       <div class="form-actions"><button id="save-btn" class="button primary save" type="button">Save catch</button><button id="cancel-edit" class="button ghost" type="button" hidden>Cancel editing</button></div>
@@ -69,13 +79,18 @@
       <div class="panel"><h3>Gemini fish identification</h3><p>AI identification requires a secure companion service. Set its HTTPS URL below after deployment. Do not enter an API key here.</p><label for="proxy-url">Gemini service URL</label><input id="proxy-url" type="url" placeholder="https://your-worker.workers.dev" inputmode="url" /><button id="save-proxy" class="button secondary" type="button">Save service URL</button><p class="helper">The Gemini API key belongs in a server-side secret, never in app files or GitHub Pages.</p></div>
       <div class="panel"><h3>Your catch data</h3><p>Your pictures and catch details are saved locally on this browser/app installation. Export backups regularly, especially before changing phones or installing a separate Android APK.</p><div class="stack"><button id="export-btn" class="button secondary" type="button">↓ Export catch backup (JSON)</button><button id="import-btn" class="button ghost" type="button">↑ Import catch backup (JSON)</button></div><input id="import-file" type="file" accept="application/json,.json" hidden/><p class="helper">Import adds catches and updates matches by ID; it does not erase other catches.</p></div>
       <div class="panel"><h3>How weather is recorded</h3><p>Temperature, local surface pressure and conditions come from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> forecasts/models. These values are estimates for the logged location and time, not direct ambient sensor readings. If you're offline, the catch saves without them.</p></div>
-      <div class="panel"><h3>Android troubleshooting</h3><p>When a catch, photo, or GPS operation fails, its error appears below. This helps identify app permission or storage issues.</p><p id="diagnostic-output" role="status" style="overflow-wrap:anywhere" hidden></p></div>
       <div class="panel"><h3>About District Flatwater</h3><p>Phase 1 — private, offline-first catch log. Version <span id="version">1.0.0</span>.</p></div>
+    </section>
+    <section id="screen-diagnostics" class="screen" aria-labelledby="diagnostics-heading" hidden>
+      <div class="section-title"><div><div class="eyebrow">TROUBLESHOOTING</div><h2 id="diagnostics-heading">Diagnostics</h2></div></div>
+      <div class="panel"><h3>Recent app errors</h3><p>Errors while saving, selecting photos or capturing GPS appear here.</p><p id="diagnostic-output" role="status" style="overflow-wrap:anywhere" hidden>No recent errors.</p></div>
+      <div id="df-diagnostics-slot"></div>
     </section>
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <dialog id="catch-dialog" class="catch-dialog"><div id="dialog-content"></div><form method="dialog"><button class="button secondary" type="submit">Close</button></form></dialog>
   <footer>District Flatwater <span>•</span> Made for days on the water.</footer>
+  <script src="./photo-metadata.js" defer></script>
   <script src="./app.js" defer></script>
   <script src="./phase3.js" defer></script>
 </body>

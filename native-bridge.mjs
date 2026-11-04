@@ -25,7 +25,11 @@ if(Capacitor.isNativePlatform()){
       const blob=await res.blob();
       if(!blob.size)throw Error('Selected photograph is empty.');
       const mime=blob.type||'image/jpeg';
-      return new File([blob], 'catch-photo.'+(mime==='image/png'?'png':'jpg'),{type:mime});
+      const file=new File([blob], 'catch-photo.'+(mime==='image/png'?'png':'jpg'),{type:mime});
+      // Some Android photo pickers return metadata separately from the image bytes.
+      // Provide it to the local EXIF reader without sending it to any service.
+      if(photo.exif&&typeof photo.exif==='object')file.nativeExif=photo.exif;
+      return file;
     },
     async getPosition(){
       const status=await Geolocation.checkPermissions();
