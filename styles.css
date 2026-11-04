@@ -38,3 +38,16 @@
   .intro-copy{grid-row:2;text-align:center}
   .intro .stats{justify-content:center}
 }
+
+/* v3.5 branded splash — shown only briefly and never blocks a failed launch. */
+.df-launch-splash{position:fixed;inset:0;z-index:9999;background:#00380e;color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;padding:28px;text-align:center;transition:opacity .24s ease}
+.df-launch-splash img{width:min(55vw,205px);height:auto;aspect-ratio:1;object-fit:contain}
+.df-launch-splash strong{font-size:clamp(1rem,4.8vw,1.55rem);font-weight:900;letter-spacing:.15em}
+.df-launch-splash span{font-size:.79rem;letter-spacing:.22em;color:#e9d9a2;font-weight:750}
+.df-launch-splash.df-splash-hide{opacity:0;pointer-events:none}
+.gps-entry{margin:14px 0;border:1px solid #c9d9c6;background:#f7f8f2;border-radius:13px;padding:14px}
+.gps-entry h3{margin:0 0 8px}
+.gps-entry .gps-coordinates label{margin-top:12px}
+.gps-entry .photo-buttons>.button{flex:1;min-width:136px}
+.gps-entry #gps-source{color:#295d3a;font-weight:700}
+@media(prefers-reduced-motion:reduce){.df-launch-splash{transition:none}}
