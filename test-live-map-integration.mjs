@@ -83,6 +83,8 @@ fakeDocument.dispatchEvent({type:'df-tab-change',detail:{name:'map'}});
 await flush();
 assert.equal(calls.created,1,'Map initializes when opened');
 assert.equal(calls.markers,1,'Initial saved catch creates one marker');
+assert.ok(registry.get('df-map-list'),'Saved location list has the DOM ID required by renderLocations');
+assert.equal(registry.get('df-map-list').children.length,1,'Initial GPS location appears in saved list');
 
 const newer={id:'second',species:'Trout',latitude:35.11,longitude:-80.92,
  capturedAt:'2026-11-04T12:00:00Z',locationSource:'manual'};
@@ -91,6 +93,7 @@ fakeDocument.dispatchEvent({type:'df-catches-changed',detail:{
  kind:'save',id:newer.id,catch:{...newer}
 }});
 assert.equal(calls.markers,2,'New saved GPS pin added synchronously while app remains open');
+assert.equal(registry.get('df-map-list').children.length,2,'New saved location appears in list without restart');
 await flush();
 assert.equal(calls.created,1,'Existing Leaflet map is retained');
 assert.equal(calls.markers,2,'Database reconciliation does not remove the new pin');
@@ -112,6 +115,7 @@ saved.push(latest);
 fakeDocument.dispatchEvent({type:'df-catches-changed',detail:{kind:'save',id:latest.id,catch:latest}});
 assert.equal(filter.value,'','Stale species filter cleared for new catch');
 assert.equal(calls.markers,3,'New species pin is visible immediately');
+assert.equal(registry.get('df-map-list').children.length,3,'Species filter reset keeps all saved locations listed');
 await flush();
 assert.equal(calls.markers,3);
 
