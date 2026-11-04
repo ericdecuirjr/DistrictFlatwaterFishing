@@ -64,8 +64,9 @@ assert.ok(logging.includes('reconcileEnteredGpsBeforeSave()'),'Save must reconci
 assert.ok(logging.includes("document.addEventListener('df-edit-catch'"),'Map editor opens saved catch in app');
 console.log('Saved GPS provenance, map source isolation, and manual-entry safeguards passed');
 
-const saveLine=logging.match(/await putCatch\(record\);.{0,180}/)?.[0]||'';
-assert.ok(saveLine.includes("document.dispatchEvent(new CustomEvent('df-catches-changed'"),'Catch saved event must dispatch after IndexedDB transaction success');
+assert.ok(/await putCatch\(record\);\s*\/\/ Commit is complete:[\s\S]{0,420}document\.dispatchEvent\(new CustomEvent\('df-catches-changed'/.test(logging),
+ 'Saved catch event must include committed coordinates and dispatch after transaction');
+assert.ok(logging.includes('latitude:record.latitude,longitude:record.longitude'),'Save notification must include exactly the saved GPS coordinates');
 const deleteLine=logging.match(/await removeCatch\(id\);.{0,150}/)?.[0]||'';
 assert.ok(deleteLine.includes("document.dispatchEvent(new CustomEvent('df-catches-changed'"),'Delete should refresh map after transaction');
 assert.ok(stage.includes("document.addEventListener('df-catches-changed'"),'Map must subscribe to committed catch changes');
@@ -74,3 +75,26 @@ assert.ok(stage.includes('if(sequence!==refreshSequence)return false'),'Stale DB
 assert.ok(stage.includes('if(map)updateMarkers()'),'Existing map pins update without recreating map');
 assert.ok(stage.includes('if(map){invalidateMap();return;}'),'Map reuses already-loaded tiles and pins');
 console.log('Live map refresh on committed catches and map tab navigation passed');
+
+const reconcileCommitted=sandbox.window.DistrictFlatwaterMapUtils.reconcileCommitted;
+const originalRecords=[
+ {id:'one',latitude:38.8895,longitude:-77.0353,species:'Bass'},
+ {id:'two',latitude:39.25,longitude:-76.61,species:'Trout'}
+];
+const newRecord={id:'three',latitude:33.7,longitude:-84.4,species:'Bass',locationSource:'manual'};
+const merged=reconcileCommitted(originalRecords,{kind:'save',id:'three',catch:newRecord});
+assert.equal(merged.length,3,'Committed save adds the new catch immediately');
+assert.equal(groupPins(locations(merged)).length,3,'New GPS creates a new pin without app restart');
+assert.equal(originalRecords.length,2,'Existing array is not mutated');
+const amended=reconcileCommitted(merged,{kind:'update',id:'three',catch:{...newRecord,latitude:35.2,longitude:-80.8}});
+assert.ok(groupPins(locations(amended)).some(g=>g.latitude===35.2),'Moved catch pin uses new saved GPS');
+assert.ok(!groupPins(locations(amended)).some(g=>g.latitude===33.7),'Old pin is removed on update');
+const deleted=reconcileCommitted(amended,{kind:'delete',id:'three'});
+assert.equal(groupPins(locations(deleted)).length,2);
+const currentPhase=readFileSync('phase3.js','utf8');
+assert.ok(currentPhase.includes("catches=window.DistrictFlatwaterMapUtils.reconcileCommitted(catches,change)"),'Committed catches are inserted into live map cache without awaiting another database read');
+assert.ok(currentPhase.includes("filter.value=''"),'Stale species filter is reset so saved GPS pin is visible');
+assert.ok(currentPhase.includes("if(!$('screen-map').hidden)renderLocations()"),'Visible map is rerendered immediately');
+assert.ok(currentPhase.includes("++refreshSequence;"),'Pending stale reads are invalidated on committed catch event');
+assert.ok(currentPhase.includes('df-map-live-status'),'Map shows live synchronization status');
+console.log('Live save→map reconciliation, stale filter, pin move/delete tests passed');
