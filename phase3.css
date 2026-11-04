@@ -18,3 +18,17 @@
 .df-privacy{margin:12px 0;font-size:.75rem;color:#647c6e;line-height:1.5}
 @media(max-width:700px){.tab{min-width:29%;font-size:.76rem;min-height:43px}.df-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#df-map{height:355px}}
 [hidden]{display:none!important}
+
+/* Stable map pins: no dependency on remote marker-image URLs. */
+.df-location-icon{background:transparent!important;border:0!important}
+.df-map-pin{
+ display:flex;align-items:center;justify-content:center;width:34px;height:34px;
+ border:3px solid white;border-radius:50% 50% 50% 6px;
+ transform:rotate(-45deg);background:#0b653c;color:white;
+ box-shadow:0 2px 9px #002b1b88;font-weight:900;font-size:.89rem;
+}
+.df-map-pin::first-letter{transform:none}
+.df-map-popup{min-width:155px;max-width:245px;font-size:.79rem;line-height:1.45}
+.df-map-popup>div{margin-top:3px}
+#df-refresh-map{margin:10px 0 0}
+#df-map{min-height:350px;background:#e0e8de}
