@@ -87,7 +87,7 @@ jobs:
             echo 'Signing secrets not set; debug APK is available.'
             exit 0
           fi
-          KEYFILE="$RUNNER_TEMP/district-flatwater-fishing-release.jks"
+          KEYFILE="$RUNNER_TEMP/district-flatwater-fishing-release.p12"
           printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$KEYFILE"
           export ANDROID_KEYSTORE_PATH="$KEYFILE"
           export ANDROID_KEYSTORE_PASSWORD="$APK_STORE_PASSWORD"
@@ -99,6 +99,7 @@ jobs:
             signingConfigs {
               create('fishingRelease') {
                 storeFile file(System.getenv('ANDROID_KEYSTORE_PATH'))
+                storeType 'pkcs12'
                 storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
                 keyAlias System.getenv('ANDROID_KEY_ALIAS')
                 keyPassword System.getenv('ANDROID_KEY_PASSWORD')
@@ -113,6 +114,21 @@ jobs:
           GRADLE
           cd android
           ./gradlew --no-daemon assembleRelease
+      - name: Verify signed release APK
+        shell: bash
+        run: |
+          APK="android/app/build/outputs/apk/release/app-release.apk"
+          if [[ ! -f "$APK" ]]; then
+            echo "No release APK was generated; skipping signature verification."
+            exit 0
+          fi
+          SIGNER="$(find "${ANDROID_HOME}/build-tools" -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+          if [[ -z "$SIGNER" ]]; then
+            echo "Could not locate Android apksigner."
+            exit 1
+          fi
+          "$SIGNER" verify --verbose --print-certs "$APK"
+          echo "Signed APK verified; review certificate SHA-256 fingerprint above."
       - name: Upload signed APK if configured
         uses: actions/upload-artifact@v4
         with:
