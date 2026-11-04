@@ -54,7 +54,12 @@ function renderLocations(){
    const google=el('a','', 'Open Maps');
    google.href='https://www.google.com/maps?q='+encodeURIComponent(record.latitude+','+record.longitude);
    google.target='_blank';google.rel='noopener noreferrer';
-   controls.append(focus,google);
+   const edit=button('','Edit GPS','button secondary compact');
+   edit.addEventListener('click',()=>{
+     if(typeof record.id==='string'&&record.id)
+       document.dispatchEvent(new CustomEvent('df-edit-catch',{detail:{id:record.id}}));
+   });
+   controls.append(focus,edit,google);
    item.append(info,controls);list.append(item);
  }
  if(rows.length>100)list.append(el('p','df-analysis-note','Showing 100 recent catches in the list. The map includes every matching saved catch.'));
