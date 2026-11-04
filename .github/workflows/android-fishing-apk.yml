@@ -1,0 +1,104 @@
+name: Build District Flatwater Fishing APK
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+      - name: Use Android package
+        run: cp package-android.json package.json
+      - name: Install packages
+        run: npm install --no-audit --no-fund
+      - name: Validate sources
+        run: |
+          node --check app.js
+          node --check phase3.js
+          node --check native-bridge.mjs
+          node --check build-web.mjs
+      - name: Build web content
+        run: npm run build:web
+      - name: Create Android project
+        run: |
+          npx cap add android
+          npx cap sync android
+      - name: Set Android version code
+        shell: bash
+        run: |
+          VERSION_CODE=$((30000 + GITHUB_RUN_NUMBER))
+          FILE=android/app/build.gradle
+          grep -Eq '^[[:space:]]*versionCode[[:space:]]+[0-9]+' "$FILE"
+          sed -i -E "s/^([[:space:]]*versionCode[[:space:]]+)[0-9]+/\1${VERSION_CODE}/" "$FILE"
+          grep -n versionCode "$FILE"
+      - name: Build test APK
+        run: |
+          chmod +x android/gradlew
+          cd android
+          ./gradlew --no-daemon assembleDebug
+      - name: Upload test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DistrictFlatwaterFishing-Debug-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Optionally sign release APK
+        env:
+          APK_KEYSTORE_BASE64: ${{ secrets.APK_KEYSTORE_BASE64 }}
+          APK_STORE_PASSWORD: ${{ secrets.APK_STORE_PASSWORD }}
+          APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          APK_KEY_PASSWORD: ${{ secrets.APK_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          if [[ -z "$APK_KEYSTORE_BASE64" || -z "$APK_STORE_PASSWORD" || -z "$APK_KEY_ALIAS" || -z "$APK_KEY_PASSWORD" ]]; then
+            echo 'Signing secrets not set; debug APK is available.'
+            exit 0
+          fi
+          KEYFILE="$RUNNER_TEMP/district-flatwater-fishing-release.jks"
+          printf '%s' "$APK_KEYSTORE_BASE64" | base64 --decode > "$KEYFILE"
+          export ANDROID_KEYSTORE_PATH="$KEYFILE"
+          export ANDROID_KEYSTORE_PASSWORD="$APK_STORE_PASSWORD"
+          export ANDROID_KEY_ALIAS="$APK_KEY_ALIAS"
+          export ANDROID_KEY_PASSWORD="$APK_KEY_PASSWORD"
+          cat >> android/app/build.gradle <<'GRADLE'
+
+          android {
+            signingConfigs {
+              create('fishingRelease') {
+                storeFile file(System.getenv('ANDROID_KEYSTORE_PATH'))
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+              }
+            }
+            buildTypes {
+              release {
+                signingConfig signingConfigs.fishingRelease
+              }
+            }
+          }
+          GRADLE
+          cd android
+          ./gradlew --no-daemon assembleRelease
+      - name: Upload signed APK if configured
+        uses: actions/upload-artifact@v4
+        with:
+          name: DistrictFlatwaterFishing-Signed-Release-APK
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: ignore
+          retention-days: 30
