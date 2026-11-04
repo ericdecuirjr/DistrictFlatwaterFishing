@@ -11,7 +11,8 @@
     "@capacitor/android": "8.5.3",
     "@capacitor/filesystem": "8.1.4",
     "@capacitor/share": "8.0.1",
-    "@capacitor/geolocation": "8.1.0"
+    "@capacitor/geolocation": "8.2.2",
+    "@capacitor/camera": "8.0.2"
   },
   "devDependencies": {
     "@capacitor/cli": "8.5.3",
