@@ -31,3 +31,7 @@ The workflow generates an Android project at build time using Capacitor and pack
 ## Limitations
 
 Android compatibility, location permissions, file import/export and the actual GitHub Actions build must be tested on your Galaxy. The APK workflow is committed but does not represent an already-built or signed APK. The Leaflet map depends on online map tiles and does not provide offline navigation. Analytics are descriptive, not evidence of causal fish behavior.
+
+## Gemini in the Android app
+
+The Android WebView may use the origin `https://localhost` instead of your GitHub Pages origin. If Gemini reports **Origin not permitted** / HTTP 403 in the APK, open Cloudflare Workers & Pages → district-flatwater-gemini → Settings → Variables and Secrets, and set `ALLOWED_ORIGIN` to the comma-separated value `https://ericdecuirjr.github.io,https://localhost`. Redeploy the Worker. Keep the API key in the Cloudflare secret only. This origin list is a browser restriction, **not** authentication; rate-limit and monitor API usage to protect the paid endpoint. Do not broaden this further without a separate auth strategy.
