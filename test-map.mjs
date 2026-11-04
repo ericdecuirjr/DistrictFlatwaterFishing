@@ -35,3 +35,28 @@ assert.ok(phase.includes("'./vendor/leaflet.js'"),'Native build should use local
 assert.ok(phase.includes('invalidateSize'),'Hidden-to-visible map needs size refresh');
 assert.ok(phase.includes('df-map-pin'),'Marker should not rely on CDN icon PNG');
 console.log('GPS location filtering, overlapping map pins and map navigation checks passed');
+
+const sourceRows=locations([
+ {id:'exif',species:'Bass',latitude:39.25,longitude:-76.75,locationSource:'photo-exif'},
+ {id:'manual',species:'Bass',latitude:'28.25',longitude:'-82.75',locationSource:'manual'},
+ {id:'phone',species:'Bass',latitude:40,longitude:-75,locationSource:'phone'},
+ {id:'legacy',species:'Bass',latitude:45,longitude:-70}
+]);
+const provenance=window.DistrictFlatwaterMapUtils.sourceCounts(sourceRows);
+assert.equal(provenance.photoExif,1);
+assert.equal(provenance.manual,1);
+assert.equal(provenance.phone,1);
+assert.equal(provenance.unspecified,1);
+assert.equal(window.DistrictFlatwaterMapUtils.sourceLabel('phone'),'Phone GPS at time of logging');
+assert.equal(window.DistrictFlatwaterMapUtils.pinKey(39.25,-76.75),'39.250000,-76.750000');
+assert.equal(window.DistrictFlatwaterMapUtils.pinKey(null,-76.75),null);
+const stage=readFileSync('phase3.js','utf8');
+const logging=readFileSync('app.js','utf8');
+assert.ok(!stage.includes('navigator.geolocation')&&!stage.includes('getCurrentPosition'),'Map never requests live phone GPS');
+assert.ok(!stage.includes('setView([0,0],2'),'Map must not invent a default geographic center');
+assert.ok(stage.includes("locationSource"),'Map shows GPS source');
+assert.ok(stage.includes('Saved GPS'),'Map labels saved GPS records');
+assert.ok(stage.includes('df-edit-catch'),'Map offers GPS correction via catch editor');
+assert.ok(logging.includes('reconcileEnteredGpsBeforeSave()'),'Save must reconcile manual GPS fields');
+assert.ok(logging.includes("document.addEventListener('df-edit-catch'"),'Map editor opens saved catch in app');
+console.log('Saved GPS provenance, map source isolation, and manual-entry safeguards passed');

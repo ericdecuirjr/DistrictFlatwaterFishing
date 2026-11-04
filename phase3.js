@@ -7,6 +7,7 @@ const $=id=>document.getElementById(id);
 const el=(tag,cls,value)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(value!==undefined)node.textContent=String(value);return node;};
 const niceDate=iso=>{const d=new Date(iso);return Number.isNaN(d.valueOf())?'Unknown date':d.toLocaleDateString();};
 let catches=[],map=null,markers=null,loadingMap=false;
+let markerByKey=new Map();
 function readCatches(){if(!window.__DF_CATCH_APP_BOOT?.initialized)return Promise.resolve([]);return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;if(!db.objectStoreNames.contains(STORE)){db.close();resolve([]);return;}const tx=db.transaction(STORE,'readonly'),get=tx.objectStore(STORE).getAll();get.onsuccess=()=>resolve(get.result||[]);get.onerror=()=>reject(get.error);tx.oncomplete=()=>db.close();};});}
 function button(id,label,cls='button secondary'){const b=el('button',cls,label);b.id=id;b.type='button';return b;}
 function panel(title){const p=el('div','panel');p.append(el('h3','',title));return p;}
@@ -24,42 +25,91 @@ const ranges=[['Below 29.80',0],['29.80–29.99',0],['30.00–30.19',0],['30.20 
 }
 function filteredLocations(){return window.DistrictFlatwaterMapUtils.locations(catches,($('df-map-search')?.value||'').trim());}
 function renderLocations(){
- const list=$('df-map-list');if(!list)return;list.replaceChildren();
- const rows=filteredLocations(),groups=window.DistrictFlatwaterMapUtils.groupPins(rows);
- $('df-map-status').textContent=rows.length+' geotagged catch'+(rows.length===1?'':'es')+' at '+groups.length+' distinct location'+(groups.length===1?'':'s')+'. '+(map?'Pins show the saved GPS locations.':'Tap Load interactive map to show pins.');
- if(!rows.length)list.append(el('div','df-empty','No GPS-tagged catches match. Check the saved coordinates.'));
- for(const c of rows.slice(0,100)){
-  const item=el('div','df-map-item'),info=el('div');
-  info.append(el('strong','',c.species||'Unidentified fish'),el('small','',niceDate(c.capturedAt)+' · '+c.latitude.toFixed(5)+', '+c.longitude.toFixed(5)));
-  const link=el('a','', 'Open Maps');link.href='https://www.google.com/maps?q='+encodeURIComponent(c.latitude+','+c.longitude);
-  link.target='_blank';link.rel='noopener noreferrer';item.append(info,link);list.append(item);
+ const list=$('df-map-list'),status=$('df-map-status');
+ if(!list||!status)return;
+ list.replaceChildren();
+ const rows=filteredLocations();
+ const groups=window.DistrictFlatwaterMapUtils.groupPins(rows);
+ const counts=window.DistrictFlatwaterMapUtils.sourceCounts(rows);
+ let summary=rows.length+' saved GPS-tagged catch'+(rows.length===1?'':'es')+' at '+groups.length+' distinct location'+(groups.length===1?'':'s')+'. ';
+ if(rows.length)summary+='Source: '+counts.photoExif+' photo EXIF, '+counts.manual+' manual, '+counts.phone+' phone, '+counts.unspecified+' unspecified.';
+ else summary+='No saved GPS coordinates match this filter. The map does not use your current phone location.';
+ status.textContent=summary;
+ const intro=$('df-map-source-note');
+ if(intro)intro.textContent=rows.length?
+  'Pins below are built only from coordinates in SAVED catch records. Phone-derived GPS means the phone location was saved when that catch was logged; it is not a fresh location lookup.':
+  'No pins to display. Open a saved catch in Gallery → Edit to add or correct GPS coordinates.';
+ if(!rows.length){
+   list.append(el('div','df-empty','No saved catch locations match. There is no automatic phone-location fallback.'));
  }
- if(rows.length>100)list.append(el('p','df-analysis-note','Showing 100 recent catches in the list; the map includes every valid GPS-tagged catch.'));
+ for(const record of rows.slice(0,100)){
+   const item=el('div','df-map-item'),info=el('div');
+   const label=window.DistrictFlatwaterMapUtils.sourceLabel(record.locationSource);
+   info.append(el('strong','',record.species||'Unidentified fish'),
+     el('small','',niceDate(record.capturedAt)+' · '+record.latitude.toFixed(6)+', '+record.longitude.toFixed(6)),
+     el('small','', 'GPS source: '+label));
+   const controls=el('div','df-map-item-controls');
+   const focus=button('','Show pin','button secondary compact');
+   focus.addEventListener('click',()=>focusSavedPin(record));
+   const google=el('a','', 'Open Maps');
+   google.href='https://www.google.com/maps?q='+encodeURIComponent(record.latitude+','+record.longitude);
+   google.target='_blank';google.rel='noopener noreferrer';
+   const edit=button('','Edit GPS','button secondary compact');
+   edit.addEventListener('click',()=>{
+     if(typeof record.id==='string'&&record.id)
+       document.dispatchEvent(new CustomEvent('df-edit-catch',{detail:{id:record.id}}));
+   });
+   controls.append(focus,edit,google);
+   item.append(info,controls);list.append(item);
+ }
+ if(rows.length>100)list.append(el('p','df-analysis-note','Showing 100 recent catches in the list. The map includes every matching saved catch.'));
  if(map)updateMarkers();
+}
+async function focusSavedPin(record){
+ const lat=window.DistrictFlatwaterMapUtils.coordinate(record.latitude,90);
+ const lon=window.DistrictFlatwaterMapUtils.coordinate(record.longitude,180);
+ if(lat===null||lon===null)return;
+ if(!map){
+   await loadMap();
+   if(!map)return;
+ }
+ invalidateMap();
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{
+   if(!map)return;
+   map.setView([lat,lon],15,{animate:false});
+   const key=window.DistrictFlatwaterMapUtils.pinKey(lat,lon);
+   const pin=markerByKey.get(key);
+   if(pin)pin.openPopup();
+ }));
 }
 function addStyle(url){return new Promise((resolve,reject)=>{const tag=el('link');tag.rel='stylesheet';tag.href=url;tag.onload=resolve;tag.onerror=reject;document.head.append(tag);});}
 function addScript(url){return new Promise((resolve,reject)=>{const tag=el('script');tag.src=url;tag.onload=resolve;tag.onerror=reject;document.head.append(tag);});}
 function updateMarkers(){
  if(!map||!window.L)return;
  if(markers)map.removeLayer(markers);
- markers=L.featureGroup();
+ markers=L.featureGroup();markerByKey=new Map();
  const groups=window.DistrictFlatwaterMapUtils.groupPins(filteredLocations());
  for(const group of groups){
-  const count=group.items.length;
-  const icon=L.divIcon({className:'df-location-icon',
-   html:'<span class="df-map-pin" aria-hidden="true">'+(count>1?String(count):'●')+'</span>',
-   iconSize:[34,42],iconAnchor:[17,38],popupAnchor:[0,-32]});
-  const marker=L.marker([group.latitude,group.longitude],{icon});
-  const popup=el('div','df-map-popup');
-  popup.append(el('strong','',count+' catch'+(count===1?'':'es')+' at this spot'),el('div','',group.latitude.toFixed(5)+', '+group.longitude.toFixed(5)));
-  for(const record of group.items.slice(0,12))popup.append(el('div','',(record.species||'Unidentified fish')+' · '+niceDate(record.capturedAt)));
-  if(count>12)popup.append(el('div','',(count-12)+' additional catches at this spot'));
-  marker.bindPopup(popup);markers.addLayer(marker);
+   const count=group.items.length;
+   const icon=L.divIcon({
+     className:'df-location-icon',
+     html:'<span class="df-map-pin" aria-hidden="true">'+(count>1?String(count):'●')+'</span>',
+     iconSize:[34,42],iconAnchor:[17,38],popupAnchor:[0,-32]
+   });
+   const marker=L.marker([group.latitude,group.longitude],{icon});
+   const popup=el('div','df-map-popup');
+   popup.append(el('strong','',count+' saved catch'+(count===1?'':'es')+' at this spot'),
+     el('div','',group.latitude.toFixed(6)+', '+group.longitude.toFixed(6)));
+   for(const record of group.items.slice(0,12)){
+     popup.append(el('div','',(record.species||'Unidentified fish')+' · '+niceDate(record.capturedAt)+' · '+window.DistrictFlatwaterMapUtils.sourceLabel(record.locationSource)));
+   }
+   if(count>12)popup.append(el('div','',(count-12)+' additional catches at this spot'));
+   marker.bindPopup(popup);markerByKey.set(group.key,marker);markers.addLayer(marker);
  }
  markers.addTo(map);
- if(groups.length===1)map.setView([groups[0].latitude,groups[0].longitude],13);
- else if(groups.length>1)map.fitBounds(markers.getBounds().pad(.22),{maxZoom:14});
- else map.setView([0,0],2);
+ // Never center on phone GPS, a hard-coded location, or (0,0) as a fallback.
+ if(groups.length===1)map.setView([groups[0].latitude,groups[0].longitude],13,{animate:false});
+ else if(groups.length>1)map.fitBounds(markers.getBounds().pad(.22),{maxZoom:14,animate:false});
  invalidateMap();
 }
 function invalidateMap(){
@@ -79,7 +129,13 @@ async function loadMap(){
    await addScript(local?'./vendor/leaflet.js':'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
   }
   if(!window.L)throw Error('Map library did not initialize');
-  map=L.map('df-map',{scrollWheelZoom:false,zoomControl:true}).setView([0,0],2);
+  const selected=window.DistrictFlatwaterMapUtils.groupPins(filteredLocations());
+  if(!selected.length){
+    $('df-map-status').textContent='No saved GPS pins to plot. The map does not substitute the phone location.';
+    b.disabled=false;b.textContent='Load interactive map';
+    return;
+  }
+  map=L.map('df-map',{scrollWheelZoom:false,zoomControl:true}).setView([selected[0].latitude,selected[0].longitude],13,{animate:false});
   let failures=0;
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'})
    .on('tileerror',()=>{if(++failures===2)$('df-map-status').textContent='Background map tiles unavailable. Saved GPS pins remain positioned; check internet access.';})
@@ -98,6 +154,9 @@ function init(){
  const data=el('div');data.id='df-analytics-data';analytics.append(data);
  const mp=panel('Catch map');
  mp.append(el('p','df-privacy','The map is loaded on request. Its tiles are requested from OpenStreetMap and can reveal the areas you view to the map provider. Your catch records are not uploaded as a database.'));
+ const provenance=el('p','df-privacy');provenance.id='df-map-source-note';
+ provenance.textContent='Only coordinates in saved catch records are used for map pins. Current phone GPS is never read from the Map screen.';
+ mp.append(provenance);
  mp.append(button('df-load-map','Load interactive map'));
  const m=el('div');m.id='df-map';mp.append(m);
  const status=el('div');status.id='df-map-status';mp.append(status);locations.append(mp);
