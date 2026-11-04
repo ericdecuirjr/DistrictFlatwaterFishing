@@ -2,10 +2,10 @@
 (function districtFlatwaterCatchApp(){
 'use strict';
 if(window.__DF_CATCH_APP_BOOT) return;
-window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.1.2'};
+window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.1.3'};
 /* District Flatwater Fishing — Phase 1. No frameworks or tracking. */
 'use strict';
-const VERSION = '3.1.2';
+const VERSION = '3.1.3';
 const DB_NAME = 'district-flatwater-catches-v1';
 const STORE = 'catches';
 const nativeBridge = () => window.DistrictFlatwaterNative;
@@ -18,7 +18,54 @@ function nowLocal(iso){const d=new Date(iso);const shift=d.getTimezoneOffset()*6
 function localToIso(str){const d=new Date(str);return Number.isNaN(d.getTime())?null:d.toISOString();}
 function prettyDate(iso){const d=new Date(iso);return Number.isNaN(d.getTime())?'Unknown date':d.toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});}
 function shortDate(iso){const d=new Date(iso);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString(undefined,{month:'short',day:'numeric'});}
-function openDb(){return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,1);request.onupgradeneeded=()=>{const store=request.result.createObjectStore(STORE,{keyPath:'id'});store.createIndex('capturedAt','capturedAt');store.createIndex('species','species');};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
+/* Open without pinning version 1: prior native builds could create an empty
+   IndexedDB database before the catch store existed. A version upgrade adds
+   the missing store WITHOUT deleting the database or any other object stores. */
+function openDb(){
+  return new Promise((resolve,reject)=>{
+    const boot=window.__DF_CATCH_APP_BOOT||{};
+    function ensureStore(request){
+      const database=request.result;
+      let store;
+      if(!database.objectStoreNames.contains(STORE)){
+        store=database.createObjectStore(STORE,{keyPath:'id'});
+      }else{
+        store=request.transaction.objectStore(STORE);
+      }
+      if(!store.indexNames.contains('capturedAt'))store.createIndex('capturedAt','capturedAt');
+      if(!store.indexNames.contains('species'))store.createIndex('species','species');
+    }
+    function finish(request,wasRepair){
+      const database=request.result;
+      if(!database.objectStoreNames.contains(STORE)){
+        database.close();
+        reject(Error('Catch storage setup did not create the catches store.'));
+        return;
+      }
+      database.onversionchange=()=>database.close();
+      boot.databaseVersion=database.version;
+      if(wasRepair)boot.databaseRepair='Created missing catches store without clearing other storage.';
+      resolve(database);
+    }
+    const request=indexedDB.open(DB_NAME);
+    request.onupgradeneeded=()=>ensureStore(request);
+    request.onerror=()=>reject(request.error||Error('Cannot open catch database.'));
+    request.onsuccess=()=>{
+      const database=request.result;
+      if(database.objectStoreNames.contains(STORE)){
+        finish(request,false);
+        return;
+      }
+      const nextVersion=database.version+1;
+      database.close();
+      const repair=indexedDB.open(DB_NAME,nextVersion);
+      repair.onupgradeneeded=()=>ensureStore(repair);
+      repair.onerror=()=>reject(repair.error||Error('Could not repair missing catch storage.'));
+      repair.onblocked=()=>{boot.storageWarning='Close other fishing app windows to finish a safe storage upgrade.';};
+      repair.onsuccess=()=>finish(repair,true);
+    };
+  });
+}
 function getAll(){return new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readonly').objectStore(STORE).getAll();req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 function getOne(id){return new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readonly').objectStore(STORE).get(id);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 function putCatch(record){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(record);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
