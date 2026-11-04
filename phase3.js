@@ -9,6 +9,7 @@ const niceDate=iso=>{const d=new Date(iso);return Number.isNaN(d.valueOf())?'Unk
 let catches=[],map=null,markers=null,loadingMap=false;
 let markerByKey=new Map();
 let refreshSequence=0;
+let liveSyncMessage='';
 function readCatches(){if(!window.__DF_CATCH_APP_BOOT?.initialized)return Promise.resolve([]);return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result;if(!db.objectStoreNames.contains(STORE)){db.close();resolve([]);return;}const tx=db.transaction(STORE,'readonly'),get=tx.objectStore(STORE).getAll();get.onsuccess=()=>resolve(get.result||[]);get.onerror=()=>reject(get.error);tx.oncomplete=()=>db.close();};});}
 function button(id,label,cls='button secondary'){const b=el('button',cls,label);b.id=id;b.type='button';return b;}
 function panel(title){const p=el('div','panel');p.append(el('h3','',title));return p;}
@@ -55,6 +56,8 @@ function renderLocations(){
  if(rows.length)summary+='Source: '+counts.photoExif+' photo EXIF, '+counts.manual+' manual, '+counts.phone+' phone, '+counts.unspecified+' unspecified.';
  else summary+='No saved GPS coordinates match this filter. The map does not use your current phone location.';
  status.textContent=summary;
+ const live=$('df-map-live-status');
+ if(live)live.textContent=liveSyncMessage||'Map synchronized with saved catch records.';
  const intro=$('df-map-source-note');
  if(intro)intro.textContent=rows.length?
   'Pins below are built only from coordinates in SAVED catch records. Phone-derived GPS means the phone location was saved when that catch was logged; it is not a fresh location lookup.':
@@ -180,7 +183,10 @@ function init(){
  mp.append(provenance);
  mp.append(button('df-load-map','Load interactive map'));
  const m=el('div');m.id='df-map';mp.append(m);
- const status=el('div');status.id='df-map-status';mp.append(status);locations.append(mp);
+ const status=el('div');status.id='df-map-status';mp.append(status);
+ const live=el('p','df-map-live-status');live.id='df-map-live-status';live.setAttribute('role','status');
+ live.textContent='Map synchronized with saved catch records.';mp.append(live);
+ locations.append(mp);
  const search=panel('Saved fishing locations'),label=el('label','','Filter by species'),input=el('input');
  label.htmlFor='df-map-search';input.id='df-map-search';input.placeholder='e.g. Largemouth bass';
  const list=el('div','df-map-list');search.append(label,input,list);locations.append(search);
@@ -201,8 +207,25 @@ function init(){
    }
  });
  $('tab-gallery')?.addEventListener('click',refresh);
- document.addEventListener('df-catches-changed',()=>{
-   // Emitted only after a successful IndexedDB transaction, never on button click.
+ document.addEventListener('df-catches-changed',event=>{
+   // Receipt is after an IndexedDB commit; update the in-memory pin data NOW.
+   // An older pending read cannot roll the markers back after this change.
+   ++refreshSequence;
+   const change=event.detail||{};
+   const filter=$('df-map-search');
+   if((change.kind==='save'||change.kind==='update')&&filter?.value){
+     // A stale species filter can make a new saved location look absent.
+     filter.value='';
+   }
+   catches=window.DistrictFlatwaterMapUtils.reconcileCommitted(catches,change);
+   const locs=filteredLocations();
+   liveSyncMessage='Latest committed change: '+(change.kind||'updated')+
+     '. '+locs.length+' GPS-tagged catches; '+
+     window.DistrictFlatwaterMapUtils.groupPins(locs).length+' map pin locations.';
+   if(!$('screen-map').hidden)renderLocations();
+   if(!$('screen-analytics').hidden)renderAnalytics();
+   // Reconcile against the full authoritative database (including photos)
+   // after applying the immediate marker update.
    refresh().then(current=>{
      if(!current||$('screen-map').hidden)return;
      if(map){invalidateMap();return;}
