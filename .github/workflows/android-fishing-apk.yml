@@ -27,6 +27,9 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Validate sources
         run: |
+          node --check historical-weather.js
+          node --check test-historical-weather.mjs
+          node test-historical-weather.mjs
           node --check app.js
           node --check photo-metadata.js
           node --check test-photo-metadata.mjs
