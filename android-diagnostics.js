@@ -68,6 +68,8 @@
       textResult(typeof indexedDB!=='undefined','IndexedDB API');
       textResult(typeof Blob!=='undefined'&&typeof File!=='undefined','Photo file APIs');
       textResult(!!getId('photo-preview'),'Catch log user interface');
+      const boot=window.__DF_CATCH_APP_BOOT;
+      textResult(!!boot?.initialized,'Catch app initialized',boot?.storageError||('main app version '+(boot?.version||'unknown')));
       textResult(typeof getId('version')?.textContent==='string','Main app version',getId('version')?.textContent||'not shown');
       if(typeof indexedDB!=='undefined')await probeDb();
       await probeNetwork();
