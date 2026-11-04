@@ -2,16 +2,17 @@
 (function districtFlatwaterCatchApp(){
 'use strict';
 if(window.__DF_CATCH_APP_BOOT) return;
-window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.2.0'};
+window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.3.0'};
 /* District Flatwater Fishing — Phase 1. No frameworks or tracking. */
 'use strict';
-const VERSION = '3.2.0';
+const VERSION = '3.3.0';
 const DB_NAME = 'district-flatwater-catches-v1';
 const STORE = 'catches';
 const nativeBridge = () => window.DistrictFlatwaterNative;
 const $ = id => document.getElementById(id);
 let db, photoBlob = null, previewUrl = null, editingId = null, draft = emptyDraft();
 let galleryUrls = [], toastTimer = null, contextToken = 0, aiPending = false, selectedMetadata = null, photoSelectionToken = 0;
+let historicalCandidate = null, historicalRequest = null, historicalGeneration = 0;
 function emptyDraft(){return {capturedAt:new Date().toISOString(),latitude:null,longitude:null,accuracy:null,weather:null,aiSuggestion:null,aiConfidence:null,scientificName:null,timeSource:'phone',locationSource:null};}
 function notify(msg,error=false){const t=$('toast');t.textContent=msg;t.className='toast show'+(error?' error':'');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.className='toast',error?9500:4300);if(error){console.warn('[District Flatwater]',msg);const diag=$('diagnostic-output');if(diag){diag.hidden=false;diag.textContent=msg;}}}
 function nowLocal(iso){const d=new Date(iso);const shift=d.getTimezoneOffset()*60000;return new Date(d.getTime()-shift).toISOString().slice(0,16);}
@@ -72,15 +73,90 @@ function putCatch(record){return new Promise((resolve,reject)=>{const tx=db.tran
 function removeCatch(id){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
 function tab(name){for(const n of ['log','gallery','settings','diagnostics']){$('screen-'+n).hidden=n!==name;const b=$('tab-'+n);b.classList.toggle('active',n===name);if(n===name)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');}if(name==='gallery')renderGallery();if(name==='log')$('species').focus({preventScroll:true});window.scrollTo({top:0,behavior:'smooth'});}
 function showNetwork(){const online=navigator.onLine;$('network-dot').classList.toggle('online',online);$('network-label').textContent=online?'Online':'Offline';}
-function updateLocationUI(){const lat=draft.latitude,lon=draft.longitude;$('location-value').textContent=Number.isFinite(lat)&&Number.isFinite(lon)?`${lat.toFixed(5)}, ${lon.toFixed(5)}`:'Not captured';$('weather-btn').disabled=!(Number.isFinite(lat)&&Number.isFinite(lon));const w=draft.weather;$('temperature-value').textContent=w&&Number.isFinite(w.temperatureF)?`${Math.round(w.temperatureF)} °F`:'—';$('pressure-value').textContent=w&&Number.isFinite(w.surfaceHpa)?`${(w.surfaceHpa*.0295299830714).toFixed(2)} inHg`:'—';$('conditions-value').textContent=w?.conditions||'—';$('forecast-value').hidden=!w?.forecast;$('forecast-value').textContent=w?.forecast||'';}
+function updateLocationUI(){const lat=draft.latitude,lon=draft.longitude;$('location-value').textContent=Number.isFinite(lat)&&Number.isFinite(lon)?`${lat.toFixed(5)}, ${lon.toFixed(5)}`:'Not captured';$('weather-btn').disabled=!(Number.isFinite(lat)&&Number.isFinite(lon));const w=draft.weather;$('temperature-value').textContent=w&&Number.isFinite(w.temperatureF)?`${Math.round(w.temperatureF)} °F`:'—';$('pressure-value').textContent=w&&Number.isFinite(w.surfaceHpa)?`${(w.surfaceHpa*.0295299830714).toFixed(2)} inHg`:'—';$('conditions-value').textContent=w?.conditions||'—';$('forecast-value').hidden=!w?.forecast;$('forecast-value').textContent=w?.forecast||'';updateHistoricalControls();}
+function updateHistoricalControls(){
+  const iso=localToIso($('caught-at').value);
+  const service=window.DistrictFlatwaterHistoricalWeather;
+  const error=service?service.check(iso,draft.latitude,draft.longitude):'Historical weather service unavailable';
+  $('historical-lookup-btn').disabled=!!error||!!historicalRequest;
+  if(!historicalCandidate && !historicalRequest)$('historical-status').textContent=error||'Ready to request weather for the selected time and coordinates.';
+}
+function cancelHistoricalPreview(){
+  historicalGeneration++;
+  if(historicalRequest){historicalRequest.abort();historicalRequest=null;}
+  historicalCandidate=null;
+  $('historical-preview').hidden=true;
+  $('historical-preview-details').textContent='';
+  $('historical-lookup-btn').textContent='◷ Look up historical weather';
+  updateHistoricalControls();
+}
+function describeHistorical(weather){
+  const labels=[
+    'Matched observation: '+new Date(weather.observedAt).toLocaleString(),
+    'Distance from selected time: '+weather.matchedMinutes+' minutes',
+    Number.isFinite(weather.temperatureF)?'Temperature: '+Math.round(weather.temperatureF)+' °F':null,
+    Number.isFinite(weather.surfaceHpa)?'Surface pressure: '+(weather.surfaceHpa*.0295299830714).toFixed(2)+' inHg':null,
+    'Conditions: '+weather.conditions,
+    'Source: '+weather.source
+  ];
+  return labels.filter(Boolean).join('\n');
+}
+async function lookupHistoricalWeather(){
+  const service=window.DistrictFlatwaterHistoricalWeather;
+  const iso=localToIso($('caught-at').value);
+  const lat=draft.latitude,lon=draft.longitude;
+  const err=service?service.check(iso,lat,lon):'Historical weather is unavailable.';
+  if(err){notify(err,true);updateHistoricalControls();return;}
+  if(!navigator.onLine){notify('Historical weather requires internet. Your catch can be saved without weather.',true);return;}
+  cancelHistoricalPreview();
+  const generation=++historicalGeneration;
+  const controller=new AbortController();
+  historicalRequest=controller;
+  $('historical-lookup-btn').disabled=true;
+  $('historical-lookup-btn').textContent='Loading historical weather...';
+  $('historical-status').textContent='Looking up the selected date and GPS coordinates. No changes to your catch yet.';
+  const timeout=setTimeout(()=>controller.abort(),18000);
+  try{
+    const result=await service.lookup(iso,lat,lon,controller.signal);
+    if(generation!==historicalGeneration||iso!==localToIso($('caught-at').value)||draft.latitude!==lat||draft.longitude!==lon)return;
+    historicalCandidate={weather:result,iso,lat,lon};
+    $('historical-preview-details').textContent=describeHistorical(result);
+    $('historical-preview').hidden=false;
+    $('historical-status').textContent='Historical estimate found. Review it, then choose Use or Discard.';
+  }catch(e){
+    if(generation===historicalGeneration){
+      $('historical-status').textContent='No historical estimate applied. '+(e?.name==='AbortError'?'Request timed out or was cancelled.':e?.message||String(e));
+    }
+  }finally{
+    clearTimeout(timeout);
+    if(generation===historicalGeneration){
+      historicalRequest=null;
+      $('historical-lookup-btn').textContent='◷ Look up historical weather';
+      updateHistoricalControls();
+    }
+  }
+}
+function applyHistoricalWeather(){
+  const candidate=historicalCandidate;
+  if(!candidate)return;
+  if(candidate.iso!==localToIso($('caught-at').value)||candidate.lat!==draft.latitude||candidate.lon!==draft.longitude){
+    cancelHistoricalPreview();notify('The catch date or location changed; look up historical weather again.',true);return;
+  }
+  draft.weather={...candidate.weather};
+  $('historical-status').textContent='Historical weather applied. Save or update the catch to retain it.';
+  cancelHistoricalPreview();
+  $('historical-status').textContent='Historical weather applied. Save or update the catch to retain it.';
+  updateLocationUI();
+  notify('Historical weather added to this catch. Review before saving.');
+}
 function wmoName(code){if(code===0)return'Clear skies';if(code===1)return'Mostly clear';if(code===2)return'Partly cloudy';if(code===3)return'Overcast';if([45,48].includes(code))return'Fog';if([51,53,55,56,57].includes(code))return'Drizzle';if([61,63,65,66,67,80,81,82].includes(code))return'Rain';if([71,73,75,77,85,86].includes(code))return'Snow';if([95,96,99].includes(code))return'Thunderstorms';return'Conditions unavailable';}
-async function fetchWeather(token=contextToken){if(!Number.isFinite(draft.latitude)||!Number.isFinite(draft.longitude)){notify('Capture GPS first.',true);return;}if(!navigator.onLine){notify('Saved location. Weather will need internet.',true);return;}
+async function fetchWeather(token=contextToken){cancelHistoricalPreview();if(!Number.isFinite(draft.latitude)||!Number.isFinite(draft.longitude)){notify('Capture GPS first.',true);return;}if(!navigator.onLine){notify('Saved location. Weather will need internet.',true);return;}
   $('weather-btn').disabled=true;$('weather-btn').textContent='Loading weather...';
   try{const p=new URLSearchParams({latitude:String(draft.latitude),longitude:String(draft.longitude),current:'temperature_2m,pressure_msl,surface_pressure,weather_code',daily:'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',temperature_unit:'fahrenheit',timezone:'auto',forecast_days:'2'});
     const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),12000);let response;try{response=await fetch('https://api.open-meteo.com/v1/forecast?'+p,{signal:controller.signal});}finally{clearTimeout(timer);}if(!response.ok)throw Error('Weather service unavailable');const j=await response.json();if(token!==contextToken)return;const c=j.current||{},d=j.daily||{};let forecast='';if(Array.isArray(d.weather_code)&&d.weather_code.length){const chance=Number.isFinite(d.precipitation_probability_max?.[0])?` · ${Math.round(d.precipitation_probability_max[0])}% chance of precipitation`:'';const hi=Number.isFinite(d.temperature_2m_max?.[0])?` · High ${Math.round(d.temperature_2m_max[0])}°F`:'';forecast=`Today's forecast: ${wmoName(d.weather_code[0])}${hi}${chance}`;}
     draft.weather={temperatureF:Number.isFinite(c.temperature_2m)?c.temperature_2m:null,surfaceHpa:Number.isFinite(c.surface_pressure)?c.surface_pressure:null,seaLevelHpa:Number.isFinite(c.pressure_msl)?c.pressure_msl:null,weatherCode:c.weather_code??null,conditions:wmoName(c.weather_code),forecast,observedAt:c.time||new Date().toISOString(),source:'Open-Meteo model'};updateLocationUI();notify('Weather recorded.');
   }catch(e){notify(`Could not load weather: ${e.message}`,true);}finally{$('weather-btn').textContent='↻ Refresh weather';updateLocationUI();}}
-async function captureLocation(){if(!nativeBridge()?.getPosition&&!navigator.geolocation){notify('Location unavailable on this device.',true);return;}const token=++contextToken;$('location-btn').disabled=true;$('location-btn').textContent='Finding GPS...';
+async function captureLocation(){cancelHistoricalPreview();if(!nativeBridge()?.getPosition&&!navigator.geolocation){notify('Location unavailable on this device.',true);return;}const token=++contextToken;$('location-btn').disabled=true;$('location-btn').textContent='Finding GPS...';
   try{const p=nativeBridge()?.getPosition?await nativeBridge().getPosition():await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:20000,maximumAge:0}));if(token!==contextToken)return;draft.latitude=p.coords.latitude;draft.longitude=p.coords.longitude;draft.accuracy=p.coords.accuracy;draft.weather=null;draft.locationSource='phone';updateLocationUI();notify('GPS captured.');await fetchWeather(token);
   }catch(e){if(token===contextToken)notify('GPS unavailable: '+(e?.message||'Check that Location is enabled and the app has permission')+'. You can save a catch without GPS.',true);}finally{$('location-btn').disabled=false;$('location-btn').textContent='◎ Capture GPS & weather';}}
 function discardPreview(){if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}}
@@ -128,11 +204,13 @@ function applyMetadata(){
   const meta=selectedMetadata;
   if(!meta)return;
   let used=[];
+  cancelHistoricalPreview();
   if(meta.date){
+    draft.weather=null;
     $('caught-at').value=meta.date.offsetKnown?nowLocal(meta.date.iso):meta.date.input;
     draft.capturedAt=localToIso($('caught-at').value)||meta.date.iso;
     draft.timeSource='photo-exif';
-    used.push('capture date/time');
+    updateLocationUI();used.push('capture date/time');
   }
   if(Number.isFinite(meta.latitude)&&Number.isFinite(meta.longitude)){
     ++contextToken; // invalidate any outstanding live GPS/weather request
@@ -152,6 +230,7 @@ async function selectPhoto(file){
     const optimized=await optimizePhoto(file);
     if(selection!==photoSelectionToken)return;
     ++contextToken;
+    cancelHistoricalPreview();
     photoBlob=optimized;draft.aiSuggestion=null;draft.aiConfidence=null;draft.scientificName=null;
     $('ai-result').hidden=true;
     if(!editingId){
@@ -176,7 +255,7 @@ async function identify(){const url=configuredProxy();if(!url){notify('Set the G
     const species=String(result.species||'').trim().slice(0,100),confidence=String(result.confidence||'low'),scientific=String(result.scientificName||'').trim().slice(0,120),note=String(result.note||'').trim().slice(0,250);draft.aiSuggestion=species;draft.aiConfidence=confidence;draft.scientificName=scientific;
     const r=$('ai-result');r.hidden=false;r.textContent=`Gemini suggests: ${species||'Unable to identify'}${scientific?' ('+scientific+')':''}. Confidence: ${confidence}.${note?' '+note:''}`;if(species && species.toLowerCase()!=='unknown'&&species.toLowerCase()!=='unidentified fish')$('species').value=species;notify('Review the AI suggestion before saving.');
   }catch(e){notify('Identification failed: '+e.message,true);}finally{aiPending=false;updateIdentifyEnabled();$('identify-btn').textContent='✦ Identify with Gemini';}}
-function resetForm(){++contextToken;++photoSelectionToken;selectedMetadata=null;$('metadata-panel').hidden=true;editingId=null;draft=emptyDraft();photoBlob=null;updatePhotoPreview();$('species').value='';$('length').value='';$('weight').value='';$('lure').value='';$('notes').value='';$('caught-at').value=nowLocal(draft.capturedAt);$('ai-result').hidden=true;$('edit-label').hidden=true;$('cancel-edit').hidden=true;$('save-btn').textContent='Save catch';updateLocationUI();}
+function resetForm(){cancelHistoricalPreview();++contextToken;++photoSelectionToken;selectedMetadata=null;$('metadata-panel').hidden=true;editingId=null;draft=emptyDraft();photoBlob=null;updatePhotoPreview();$('species').value='';$('length').value='';$('weight').value='';$('lure').value='';$('notes').value='';$('caught-at').value=nowLocal(draft.capturedAt);$('ai-result').hidden=true;$('edit-label').hidden=true;$('cancel-edit').hidden=true;$('save-btn').textContent='Save catch';updateLocationUI();}
 async function saveCatch(){const species=$('species').value.trim();const iso=localToIso($('caught-at').value);if(!photoBlob){notify('Add a catch photo first.',true);return;}if(!species){notify('Enter or confirm the fish species.',true);$('species').focus();return;}if(!iso){notify('Enter a valid catch date/time.',true);return;}
   const length=$('length').value.trim(),weight=$('weight').value.trim();if((length&&(!Number.isFinite(+length)||+length<=0||+length>200))||(weight&&(!Number.isFinite(+weight)||+weight<=0||+weight>2000))){notify('Check the length or weight values.',true);return;}
   $('save-btn').disabled=true;try{const old=editingId?await getOne(editingId):null;const record={id:editingId||(typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('')),species,capturedAt:iso,photo:photoBlob,latitude:draft.latitude,longitude:draft.longitude,accuracy:draft.accuracy,weather:draft.weather,aiSuggestion:draft.aiSuggestion,aiConfidence:draft.aiConfidence,scientificName:draft.scientificName,timeSource:draft.timeSource||null,locationSource:draft.locationSource||null,lengthIn:length?Number(length):null,weightLb:weight?Number(weight):null,lure:$('lure').value.trim(),notes:$('notes').value.trim(),createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};await putCatch(record);notify(editingId?'Catch updated.':'Catch saved to this device.');resetForm();await refreshStats();tab('gallery');}catch(e){notify('Saving failed: '+(e?.message||String(e))+'. Check device storage and try a smaller photo.',true);}finally{$('save-btn').disabled=false;}}
@@ -190,15 +269,15 @@ async function renderGallery(){const list=await getAll();const select=$('species
   for(const item of rows){const card=node('article','catch-card');const img=node('img','photo');const url=URL.createObjectURL(item.photo);galleryUrls.push(url);img.src=url;img.alt='Catch photo: '+item.species;img.loading='lazy';const body=node('div','catch-body'),title=node('strong',null,item.species),date=node('small',null,prettyDate(item.capturedAt)),meta=node('div','meta',[(item.lengthIn?item.lengthIn+' in':''),(item.weightLb?item.weightLb+' lb':'')].filter(Boolean).join(' · ')||item.weather?.conditions||'Catch details');const actions=node('div','card-actions');
     const view=node('button',null,'View'),edit=node('button',null,'Edit'),del=node('button',null,'Delete');for(const b of [view,edit,del])b.type='button';view.addEventListener('click',()=>showCatch(item));edit.addEventListener('click',()=>editCatch(item.id));del.addEventListener('click',()=>deleteCatch(item.id));actions.append(view,edit,del);body.append(title,date,meta,actions);card.append(img,body);grid.append(card);
   }}
-function showCatch(item){const box=$('dialog-content');box.replaceChildren();const img=node('img');const url=URL.createObjectURL(item.photo);img.src=url;img.alt=item.species;box.append(img,node('h3',null,item.species));appendInfo(box,'Date',prettyDate(item.capturedAt));if(item.timeSource==='photo-exif')appendInfo(box,'Date source','Original photo EXIF');if(item.locationSource==='photo-exif')appendInfo(box,'GPS source','Original photo EXIF');if(Number.isFinite(item.latitude)&&Number.isFinite(item.longitude)){const p=node('p');p.append(node('strong',null,'GPS: '));const a=node('a',null,`${item.latitude.toFixed(5)}, ${item.longitude.toFixed(5)}`);a.href=`https://www.google.com/maps?q=${encodeURIComponent(item.latitude+','+item.longitude)}`;a.target='_blank';a.rel='noopener noreferrer';p.append(a);box.append(p);}if(item.weather){appendInfo(box,'Temperature',Number.isFinite(item.weather.temperatureF)?Math.round(item.weather.temperatureF)+' °F':null);appendInfo(box,'Surface pressure',Number.isFinite(item.weather.surfaceHpa)?(item.weather.surfaceHpa*.0295299830714).toFixed(2)+' inHg':null);appendInfo(box,'Conditions',item.weather.conditions);appendInfo(box,'Forecast',item.weather.forecast);}appendInfo(box,'Length',item.lengthIn?item.lengthIn+' in':null);appendInfo(box,'Weight',item.weightLb?item.weightLb+' lb':null);appendInfo(box,'Bait / lure',item.lure);appendInfo(box,'Notes',item.notes);if(item.aiSuggestion)appendInfo(box,'Gemini suggestion',item.aiSuggestion+' ('+(item.aiConfidence||'unknown')+' confidence)');$('catch-dialog').showModal();$('catch-dialog').addEventListener('close',()=>URL.revokeObjectURL(url),{once:true});}
-async function editCatch(id){const item=await getOne(id);if(!item)return;editingId=id;++contextToken;draft={capturedAt:item.capturedAt,latitude:item.latitude,longitude:item.longitude,accuracy:item.accuracy,weather:item.weather,aiSuggestion:item.aiSuggestion||null,aiConfidence:item.aiConfidence||null,scientificName:item.scientificName||null,timeSource:item.timeSource||null,locationSource:item.locationSource||null};selectedMetadata=null;$('metadata-panel').hidden=true;photoBlob=item.photo;$('species').value=item.species;$('caught-at').value=nowLocal(item.capturedAt);$('length').value=item.lengthIn??'';$('weight').value=item.weightLb??'';$('lure').value=item.lure||'';$('notes').value=item.notes||'';$('ai-result').hidden=!item.aiSuggestion;if(item.aiSuggestion)$('ai-result').textContent='Previous Gemini suggestion: '+item.aiSuggestion;updatePhotoPreview();updateLocationUI();$('edit-label').hidden=false;$('cancel-edit').hidden=false;$('save-btn').textContent='Update catch';tab('log');}
+function showCatch(item){const box=$('dialog-content');box.replaceChildren();const img=node('img');const url=URL.createObjectURL(item.photo);img.src=url;img.alt=item.species;box.append(img,node('h3',null,item.species));appendInfo(box,'Date',prettyDate(item.capturedAt));if(item.timeSource==='photo-exif')appendInfo(box,'Date source','Original photo EXIF');if(item.locationSource==='photo-exif')appendInfo(box,'GPS source','Original photo EXIF');if(Number.isFinite(item.latitude)&&Number.isFinite(item.longitude)){const p=node('p');p.append(node('strong',null,'GPS: '));const a=node('a',null,`${item.latitude.toFixed(5)}, ${item.longitude.toFixed(5)}`);a.href=`https://www.google.com/maps?q=${encodeURIComponent(item.latitude+','+item.longitude)}`;a.target='_blank';a.rel='noopener noreferrer';p.append(a);box.append(p);}if(item.weather){appendInfo(box,'Weather source',item.weather.source||'Not specified');if(item.weather.historical&&item.weather.observedAt)appendInfo(box,'Historical hour',prettyDate(item.weather.observedAt));appendInfo(box,'Temperature',Number.isFinite(item.weather.temperatureF)?Math.round(item.weather.temperatureF)+' °F':null);appendInfo(box,'Surface pressure',Number.isFinite(item.weather.surfaceHpa)?(item.weather.surfaceHpa*.0295299830714).toFixed(2)+' inHg':null);appendInfo(box,'Conditions',item.weather.conditions);appendInfo(box,'Forecast',item.weather.forecast);}appendInfo(box,'Length',item.lengthIn?item.lengthIn+' in':null);appendInfo(box,'Weight',item.weightLb?item.weightLb+' lb':null);appendInfo(box,'Bait / lure',item.lure);appendInfo(box,'Notes',item.notes);if(item.aiSuggestion)appendInfo(box,'Gemini suggestion',item.aiSuggestion+' ('+(item.aiConfidence||'unknown')+' confidence)');$('catch-dialog').showModal();$('catch-dialog').addEventListener('close',()=>URL.revokeObjectURL(url),{once:true});}
+async function editCatch(id){const item=await getOne(id);if(!item)return;cancelHistoricalPreview();editingId=id;++contextToken;draft={capturedAt:item.capturedAt,latitude:item.latitude,longitude:item.longitude,accuracy:item.accuracy,weather:item.weather,aiSuggestion:item.aiSuggestion||null,aiConfidence:item.aiConfidence||null,scientificName:item.scientificName||null,timeSource:item.timeSource||null,locationSource:item.locationSource||null};selectedMetadata=null;$('metadata-panel').hidden=true;photoBlob=item.photo;$('species').value=item.species;$('caught-at').value=nowLocal(item.capturedAt);$('length').value=item.lengthIn??'';$('weight').value=item.weightLb??'';$('lure').value=item.lure||'';$('notes').value=item.notes||'';$('ai-result').hidden=!item.aiSuggestion;if(item.aiSuggestion)$('ai-result').textContent='Previous Gemini suggestion: '+item.aiSuggestion;updatePhotoPreview();updateLocationUI();$('edit-label').hidden=false;$('cancel-edit').hidden=false;$('save-btn').textContent='Update catch';tab('log');}
 async function deleteCatch(id){const item=await getOne(id);if(!item||!confirm(`Delete the ${item.species} catch from ${shortDate(item.capturedAt)}? This cannot be undone.`))return;await removeCatch(id);notify('Catch deleted.');await refreshStats();await renderGallery();}
 async function exportBackup(){const catches=await getAll();$('export-btn').disabled=true;try{const rows=[];for(const c of catches){const {photo,...details}=c;rows.push({...details,photoDataUrl:`data:${photo.type||'image/jpeg'};base64,${await blobBase64(photo)}`});}const payload={application:'district-flatwater-fishing',formatVersion:1,exportedAt:new Date().toISOString(),catches:rows};const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='district-flatwater-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);notify(`Exported ${rows.length} catches.`);}catch(e){notify('Backup failed: '+e.message,true);}finally{$('export-btn').disabled=false;}}
 function dataUrlToBlob(uri){const match=/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(uri||'');if(!match)throw Error('Invalid photo in backup');const bin=atob(match[2]);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return new Blob([bytes],{type:match[1]});}
 async function importBackup(file){if(!file)return;if(file.size>120*1024*1024){notify('Backup too large for this import. Split your archive.',true);return;}try{const data=JSON.parse(await file.text());if(data.application!=='district-flatwater-fishing'||data.formatVersion!==1||!Array.isArray(data.catches))throw Error('Unsupported District Flatwater backup format');if(data.catches.length>2000)throw Error('Too many catches in one import');let count=0;for(const c of data.catches){if(typeof c.id!=='string'||typeof c.species!=='string'||typeof c.capturedAt!=='string'||!c.photoDataUrl||!Number.isFinite(Date.parse(c.capturedAt)))throw Error('Backup contains an invalid catch');const {photoDataUrl,...record}=c;record.photo=dataUrlToBlob(photoDataUrl);record.species=record.species.slice(0,100);await putCatch(record);count++;}await refreshStats();notify(`Imported ${count} catches.`);tab('gallery');}catch(e){notify('Import failed: '+e.message,true);}finally{$('import-file').value='';}}
 function saveProxy(){const value=$('proxy-url').value.trim().replace(/\/$/,'');if(value){let u;try{u=new URL(value);}catch(_){notify('Enter a valid HTTPS service URL.',true);return;}if(u.protocol!=='https:'||u.username||u.password||u.search||u.hash){notify('Use only the HTTPS service base URL (no password or query).',true);return;}localStorage.setItem('df-gemini-proxy',u.href.replace(/\/$/,''));}else localStorage.removeItem('df-gemini-proxy');notify(value?'Gemini service URL saved.':'Gemini service URL cleared.');}
 async function init(){try{db=await openDb();}catch(e){window.__DF_CATCH_APP_BOOT.storageError=String(e?.message||e);notify('Storage unavailable. Check private browsing settings.',true);return;}$('version').textContent=VERSION;resetForm();showNetwork();$('proxy-url').value=configuredProxy();for(const button of document.querySelectorAll('[data-tab]'))button.addEventListener('click',()=>tab(button.dataset.tab));$('new-from-gallery').addEventListener('click',()=>{resetForm();tab('log');});$('take-photo').addEventListener('click',async()=>{if(!nativeBridge()?.pickPhoto){$('camera-input').click();return;}try{await selectPhoto(await nativeBridge().pickPhoto('camera'));}catch(e){notify('Camera: '+(e?.message||String(e)),true);}});
-$('choose-photo').addEventListener('click',async()=>{if(!nativeBridge()?.pickPhoto){$('upload-input').click();return;}try{await selectPhoto(await nativeBridge().pickPhoto('gallery'));}catch(e){notify('Photo selection: '+(e?.message||String(e)),true);}});$('camera-input').addEventListener('change',e=>{selectPhoto(e.target.files[0]);e.target.value='';});$('upload-input').addEventListener('change',e=>{selectPhoto(e.target.files[0]);e.target.value='';});$('metadata-apply').addEventListener('click',applyMetadata);$('metadata-skip').addEventListener('click',()=>{$('metadata-actions').hidden=true;$('metadata-summary').textContent+=' · Kept existing values. Use Capture GPS & weather for current location.';});$('location-btn').addEventListener('click',captureLocation);$('weather-btn').addEventListener('click',()=>fetchWeather());$('identify-btn').addEventListener('click',identify);$('save-btn').addEventListener('click',saveCatch);$('cancel-edit').addEventListener('click',()=>{resetForm();tab('gallery');});$('species-filter').addEventListener('change',renderGallery);$('sort-by').addEventListener('change',renderGallery);$('save-proxy').addEventListener('click',saveProxy);$('export-btn').addEventListener('click',exportBackup);$('import-btn').addEventListener('click',()=>$('import-file').click());$('import-file').addEventListener('change',e=>importBackup(e.target.files[0]));window.addEventListener('online',showNetwork);window.addEventListener('offline',showNetwork);await refreshStats();window.__DF_CATCH_APP_BOOT.initialized=true;document.dispatchEvent(new Event('df-catch-ready'));if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+$('choose-photo').addEventListener('click',async()=>{if(!nativeBridge()?.pickPhoto){$('upload-input').click();return;}try{await selectPhoto(await nativeBridge().pickPhoto('gallery'));}catch(e){notify('Photo selection: '+(e?.message||String(e)),true);}});$('camera-input').addEventListener('change',e=>{selectPhoto(e.target.files[0]);e.target.value='';});$('upload-input').addEventListener('change',e=>{selectPhoto(e.target.files[0]);e.target.value='';});$('historical-lookup-btn').addEventListener('click',lookupHistoricalWeather);$('historical-apply-btn').addEventListener('click',applyHistoricalWeather);$('historical-discard-btn').addEventListener('click',()=>{$('historical-status').textContent='Historical weather result discarded; no changes made.';cancelHistoricalPreview();$('historical-status').textContent='Historical weather result discarded; no changes made.';});$('caught-at').addEventListener('input',()=>{cancelHistoricalPreview();if(draft.weather){draft.weather=null;updateLocationUI();}});$('metadata-apply').addEventListener('click',applyMetadata);$('metadata-skip').addEventListener('click',()=>{$('metadata-actions').hidden=true;$('metadata-summary').textContent+=' · Kept existing values. Use Capture GPS & weather for current location.';});$('location-btn').addEventListener('click',captureLocation);$('weather-btn').addEventListener('click',()=>fetchWeather());$('identify-btn').addEventListener('click',identify);$('save-btn').addEventListener('click',saveCatch);$('cancel-edit').addEventListener('click',()=>{resetForm();tab('gallery');});$('species-filter').addEventListener('change',renderGallery);$('sort-by').addEventListener('change',renderGallery);$('save-proxy').addEventListener('click',saveProxy);$('export-btn').addEventListener('click',exportBackup);$('import-btn').addEventListener('click',()=>$('import-file').click());$('import-file').addEventListener('change',e=>importBackup(e.target.files[0]));window.addEventListener('online',showNetwork);window.addEventListener('offline',showNetwork);await refreshStats();window.__DF_CATCH_APP_BOOT.initialized=true;document.dispatchEvent(new Event('df-catch-ready'));if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 document.addEventListener('DOMContentLoaded',init);
 
 })();

@@ -8,3 +8,11 @@
 .photo-metadata-panel .metadata-summary{font-size:.84rem;line-height:1.5;margin:10px 0;color:#244536;overflow-wrap:anywhere}
 .photo-metadata-panel .photo-buttons .button{flex:1;min-width:135px}
 @media(max-width:700px){.tabs .tab{min-width:30%}}
+
+/* Optional historical-weather lookup preview, aligned with photo EXIF review. */
+.historical-weather-panel{margin-top:16px;border:1px solid #c9d9c6;border-radius:13px;background:#f7f8f2;padding:15px}
+.historical-weather-panel .panel-heading h3{margin:0}
+.historical-weather-panel #historical-lookup-btn{margin-top:12px;width:100%}
+.historical-weather-panel .metadata-summary{font-size:.83rem;line-height:1.5;overflow-wrap:anywhere;color:#315547;margin:10px 0}
+.historical-preview-details{white-space:pre-line;font-size:.83rem;line-height:1.6;background:white;border:1px solid #dfe8dd;border-radius:10px;padding:12px;color:#183d33}
+.historical-weather-panel .photo-buttons .button{flex:1;min-width:145px}

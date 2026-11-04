@@ -65,6 +65,20 @@
         <div id="forecast-value" class="forecast" hidden></div>
         <div class="photo-buttons"><button id="location-btn" class="button secondary" type="button">◎ Capture GPS & weather</button><button id="weather-btn" class="button ghost" type="button" disabled>↻ Refresh weather</button></div>
         <p class="helper">Capture GPS &amp; weather uses the phone's current location and current model conditions. For older photos, choose their EXIF location instead and use Refresh weather only if current conditions are appropriate. Pressure and temperature are model estimates.</p>
+        <div id="historical-weather-panel" class="historical-weather-panel">
+          <div class="panel-heading"><h3>Historical weather lookup</h3><span class="pill">Optional</span></div>
+          <p class="helper">For older catch photographs, first apply the original photo date and GPS above (or enter a correct date and location). Then look up historical hourly conditions for that place and time. No data is saved until you approve the preview.</p>
+          <button id="historical-lookup-btn" class="button secondary" type="button" disabled>◷ Look up historical weather</button>
+          <p id="historical-status" class="metadata-summary" role="status">Select a location and date to look up historical conditions.</p>
+          <div id="historical-preview" hidden>
+            <div id="historical-preview-details" class="historical-preview-details"></div>
+            <div class="photo-buttons">
+              <button id="historical-apply-btn" class="button primary" type="button">Use historical weather</button>
+              <button id="historical-discard-btn" class="button ghost" type="button">Discard result</button>
+            </div>
+          </div>
+          <p class="helper">Open-Meteo historical data are modeled estimates, not direct measurements. Time is matched to the closest UTC hour. Recent dates, older years, and some locations may lack data. Only the selected coordinates and date range are sent to Open-Meteo.</p>
+        </div>
       </div>
       <div class="panel"><h3>Catch details <span class="optional">(optional)</span></h3><div class="two-col"><div><label for="length">Length (inches)</label><input id="length" type="number" min="0" max="200" step="0.1" inputmode="decimal" placeholder="—" /></div><div><label for="weight">Weight (pounds)</label><input id="weight" type="number" min="0" max="2000" step="0.01" inputmode="decimal" placeholder="—" /></div></div><label for="lure">Bait / lure</label><input id="lure" type="text" maxlength="120" placeholder="What worked?" /><label for="notes">Notes</label><textarea id="notes" rows="3" maxlength="1500" placeholder="Water conditions, technique, or a good story..."></textarea></div>
       <div class="form-actions"><button id="save-btn" class="button primary save" type="button">Save catch</button><button id="cancel-edit" class="button ghost" type="button" hidden>Cancel editing</button></div>
@@ -91,6 +105,7 @@
   <dialog id="catch-dialog" class="catch-dialog"><div id="dialog-content"></div><form method="dialog"><button class="button secondary" type="submit">Close</button></form></dialog>
   <footer>District Flatwater <span>•</span> Made for days on the water.</footer>
   <script src="./photo-metadata.js" defer></script>
+  <script src="./historical-weather.js" defer></script>
   <script src="./app.js" defer></script>
   <script src="./phase3.js" defer></script>
 </body>
