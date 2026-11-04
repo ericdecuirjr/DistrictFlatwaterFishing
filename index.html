@@ -31,12 +31,6 @@
       </div>
       <img class="intro-emblem" src="./branding-logo.svg" alt="District Flatwater Fishing bass and fleur-de-lis emblem" width="240" height="240" />
     </section>
-    <nav class="tabs" aria-label="App sections">
-      <button id="tab-log" class="tab active" data-tab="log" aria-current="page" type="button">＋ Log catch</button>
-      <button id="tab-gallery" class="tab" data-tab="gallery" type="button">▦ Gallery</button>
-      <button id="tab-settings" class="tab" data-tab="settings" type="button">⚙ Settings</button>
-      <button id="tab-diagnostics" class="tab" data-tab="diagnostics" type="button">🛠 Diagnostics</button>
-    </nav>
     <section id="screen-log" class="screen" aria-labelledby="log-heading">
       <div class="section-title"><div><div class="eyebrow">NEW ENTRY</div><h2 id="log-heading">Log a catch</h2></div><small id="edit-label" hidden>Editing saved catch</small></div>
       <div class="panel">
@@ -111,21 +105,53 @@
       <div id="gallery-grid" class="gallery-grid"></div><div id="gallery-empty" class="empty"><span>🎣</span><h3>No catches to show</h3><p>Photograph your first catch to begin your logbook.</p></div>
     </section>
     <section id="screen-settings" class="screen" aria-labelledby="settings-heading" hidden>
-      <div class="section-title"><div><div class="eyebrow">PREFERENCES</div><h2 id="settings-heading">Settings & backup</h2></div></div>
+      <div class="section-title"><div><div class="eyebrow">PREFERENCES</div><h2 id="settings-heading">Settings & backup</h2></div><button class="button secondary compact" type="button" data-tab="more">← More</button></div>
       <div class="panel"><h3>Gemini fish identification</h3><p>AI identification requires a secure companion service. Set its HTTPS URL below after deployment. Do not enter an API key here.</p><label for="proxy-url">Gemini service URL</label><input id="proxy-url" type="url" placeholder="https://your-worker.workers.dev" inputmode="url" /><button id="save-proxy" class="button secondary" type="button">Save service URL</button><p class="helper">The Gemini API key belongs in a server-side secret, never in app files or GitHub Pages.</p></div>
       <div class="panel"><h3>Your catch data</h3><p>Your pictures and catch details are saved locally on this browser/app installation. Export backups regularly, especially before changing phones or installing a separate Android APK.</p><div class="stack"><button id="export-btn" class="button secondary" type="button">↓ Export catch backup (JSON)</button><button id="import-btn" class="button ghost" type="button">↑ Import catch backup (JSON)</button></div><input id="import-file" type="file" accept="application/json,.json" hidden/><p class="helper">Import adds catches and updates matches by ID; it does not erase other catches.</p></div>
       <div class="panel"><h3>How weather is recorded</h3><p>Temperature, local surface pressure and conditions come from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> forecasts/models. These values are estimates for the logged location and time, not direct ambient sensor readings. If you're offline, the catch saves without them.</p></div>
       <div class="panel"><h3>About District Flatwater</h3><p>Phase 1 — private, offline-first catch log. Version <span id="version">1.0.0</span>.</p></div>
     </section>
     <section id="screen-diagnostics" class="screen" aria-labelledby="diagnostics-heading" hidden>
-      <div class="section-title"><div><div class="eyebrow">TROUBLESHOOTING</div><h2 id="diagnostics-heading">Diagnostics</h2></div></div>
+      <div class="section-title"><div><div class="eyebrow">TROUBLESHOOTING</div><h2 id="diagnostics-heading">Diagnostics</h2></div><button class="button secondary compact" type="button" data-tab="more">← More</button></div>
       <div class="panel"><h3>Recent app errors</h3><p>Errors while saving, selecting photos or capturing GPS appear here.</p><p id="diagnostic-output" role="status" style="overflow-wrap:anywhere" hidden>No recent errors.</p></div>
       <div id="df-diagnostics-slot"></div>
+    </section>
+    <section id="screen-more" class="screen" aria-labelledby="more-heading" hidden>
+      <div class="section-title"><div><div class="eyebrow">TOOLS & PREFERENCES</div><h2 id="more-heading">More</h2></div></div>
+      <div class="more-navigation">
+        <button type="button" class="more-option" data-tab="settings">
+          <span class="more-option-icon" aria-hidden="true">⚙</span>
+          <span class="more-option-copy"><strong>Settings & backup</strong><small>Gemini connection, data export and import</small></span>
+          <span class="more-chevron" aria-hidden="true">›</span>
+        </button>
+        <button type="button" class="more-option" data-tab="diagnostics">
+          <span class="more-option-icon" aria-hidden="true">⌁</span>
+          <span class="more-option-copy"><strong>Diagnostics</strong><small>App checks and troubleshooting</small></span>
+          <span class="more-chevron" aria-hidden="true">›</span>
+        </button>
+      </div>
     </section>
   </main>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <dialog id="catch-dialog" class="catch-dialog"><div id="dialog-content"></div><form method="dialog"><button class="button secondary" type="submit">Close</button></form></dialog>
   <footer>District Flatwater <span>•</span> Made for days on the water.</footer>
+  <nav id="app-bottom-nav" class="bottom-nav" aria-label="Main navigation">
+    <button id="tab-log" class="bottom-nav-item active" type="button" data-tab="log" aria-current="page" aria-label="Log catch">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Log</span>
+    </button>
+    <button id="tab-gallery" class="bottom-nav-item" type="button" data-tab="gallery" aria-label="Catch gallery">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Gallery</span>
+    </button>
+    <button id="tab-analytics" class="bottom-nav-item" type="button" data-tab="analytics" aria-label="Catch analytics">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18M7 15l4-4 3 2 5-7"/></svg><span>Analytics</span>
+    </button>
+    <button id="tab-map" class="bottom-nav-item" type="button" data-tab="map" aria-label="Fishing locations map">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15"/></svg><span>Map</span>
+    </button>
+    <button id="tab-more" class="bottom-nav-item" type="button" data-tab="more" aria-label="More settings and tools">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>More</span>
+    </button>
+  </nav>
   <script src="./gps-coordinates.js" defer></script>
   <script src="./photo-metadata.js" defer></script>
   <script src="./historical-weather.js" defer></script>
