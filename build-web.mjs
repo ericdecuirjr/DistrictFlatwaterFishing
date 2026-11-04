@@ -10,7 +10,7 @@ for(const file of ['leaflet.js','leaflet.css']){
  if(!existsSync(source))throw Error('Missing Leaflet asset '+source);
  cpSync(source,out+'/vendor/'+file);
 }
-cpSync('node_modules/leaflet/LICENSE',out+'/vendor/leaflet-LICENSE.txt');
+if(existsSync('node_modules/leaflet/LICENSE'))cpSync('node_modules/leaflet/LICENSE',out+'/vendor/leaflet-LICENSE.txt');
 for(const file of ['index.html','app.js','styles.css','phase3.js','phase3.css','sw.js','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','android-diagnostics.js','photo-metadata.js','historical-weather.js','branding-logo.svg','map-utils.js','gps-coordinates.js','splash.js']){
  if(!existsSync(file))throw Error('Missing '+file);
  cpSync(file,out+'/'+file);
