@@ -28,6 +28,7 @@ jobs:
       - name: Validate sources
         run: |
           node --check app.js
+          node --check android-diagnostics.js
           node --check phase3.js
           node --check native-bridge.mjs
           node --check build-web.mjs
