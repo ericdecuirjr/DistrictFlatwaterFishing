@@ -77,7 +77,7 @@ function updateLocationUI(){const lat=draft.latitude,lon=draft.longitude;$('loca
 function updateHistoricalControls(){
   const iso=localToIso($('caught-at').value);
   const service=window.DistrictFlatwaterHistoricalWeather;
-  const error=service?.check?.(iso,draft.latitude,draft.longitude)||'Historical weather service unavailable';
+  const error=service?service.check(iso,draft.latitude,draft.longitude):'Historical weather service unavailable';
   $('historical-lookup-btn').disabled=!!error||!!historicalRequest;
   if(!historicalCandidate && !historicalRequest)$('historical-status').textContent=error||'Ready to request weather for the selected time and coordinates.';
 }
@@ -105,7 +105,7 @@ async function lookupHistoricalWeather(){
   const service=window.DistrictFlatwaterHistoricalWeather;
   const iso=localToIso($('caught-at').value);
   const lat=draft.latitude,lon=draft.longitude;
-  const err=service?.check?.(iso,lat,lon)||'Historical weather is unavailable.';
+  const err=service?service.check(iso,lat,lon):'Historical weather is unavailable.';
   if(err){notify(err,true);updateHistoricalControls();return;}
   if(!navigator.onLine){notify('Historical weather requires internet. Your catch can be saved without weather.',true);return;}
   cancelHistoricalPreview();
@@ -206,10 +206,11 @@ function applyMetadata(){
   let used=[];
   cancelHistoricalPreview();
   if(meta.date){
+    draft.weather=null;
     $('caught-at').value=meta.date.offsetKnown?nowLocal(meta.date.iso):meta.date.input;
     draft.capturedAt=localToIso($('caught-at').value)||meta.date.iso;
     draft.timeSource='photo-exif';
-    used.push('capture date/time');
+    updateLocationUI();used.push('capture date/time');
   }
   if(Number.isFinite(meta.latitude)&&Number.isFinite(meta.longitude)){
     ++contextToken; // invalidate any outstanding live GPS/weather request
