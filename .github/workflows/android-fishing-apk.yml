@@ -46,6 +46,8 @@ jobs:
           node --check map-utils.js
           node --check test-map.mjs
           node test-map.mjs
+          node --check test-live-map-integration.mjs
+          node test-live-map-integration.mjs
           node --check phase3.js
           node --check native-bridge.mjs
           node --check build-web.mjs

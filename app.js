@@ -2,10 +2,10 @@
 (function districtFlatwaterCatchApp(){
 'use strict';
 if(window.__DF_CATCH_APP_BOOT) return;
-window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.7.2'};
+window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.7.3'};
 /* District Flatwater Fishing — Phase 1. No frameworks or tracking. */
 'use strict';
-const VERSION = '3.7.2';
+const VERSION = '3.7.3';
 const DB_NAME = 'district-flatwater-catches-v1';
 const STORE = 'catches';
 const nativeBridge = () => window.DistrictFlatwaterNative;
@@ -333,7 +333,15 @@ function reconcileEnteredGpsBeforeSave(){
 async function saveCatch(){const species=$('species').value.trim();const iso=localToIso($('caught-at').value);if(!photoBlob){notify('Add a catch photo first.',true);return;}if(!species){notify('Enter or confirm the fish species.',true);$('species').focus();return;}if(!iso){notify('Enter a valid catch date/time.',true);return;}
   if(!reconcileEnteredGpsBeforeSave())return;
   const length=$('length').value.trim(),weight=$('weight').value.trim();if((length&&(!Number.isFinite(+length)||+length<=0||+length>200))||(weight&&(!Number.isFinite(+weight)||+weight<=0||+weight>2000))){notify('Check the length or weight values.',true);return;}
-  $('save-btn').disabled=true;try{const old=editingId?await getOne(editingId):null;const record={id:editingId||(typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('')),species,capturedAt:iso,photo:photoBlob,latitude:draft.latitude,longitude:draft.longitude,accuracy:draft.accuracy,weather:draft.weather,aiSuggestion:draft.aiSuggestion,aiConfidence:draft.aiConfidence,scientificName:draft.scientificName,timeSource:draft.timeSource||null,locationSource:draft.locationSource||null,lengthIn:length?Number(length):null,weightLb:weight?Number(weight):null,lure:$('lure').value.trim(),notes:$('notes').value.trim(),createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};await putCatch(record);document.dispatchEvent(new CustomEvent('df-catches-changed',{detail:{kind:'save',id:record.id}}));notify(editingId?'Catch updated.':'Catch saved to this device.');resetForm();await refreshStats();tab('gallery');}catch(e){notify('Saving failed: '+(e?.message||String(e))+'. Check device storage and try a smaller photo.',true);}finally{$('save-btn').disabled=false;}}
+  $('save-btn').disabled=true;try{const old=editingId?await getOne(editingId):null;const record={id:editingId||(typeof crypto.randomUUID==='function'?crypto.randomUUID():Array.from(crypto.getRandomValues(new Uint8Array(16)),b=>b.toString(16).padStart(2,'0')).join('')),species,capturedAt:iso,photo:photoBlob,latitude:draft.latitude,longitude:draft.longitude,accuracy:draft.accuracy,weather:draft.weather,aiSuggestion:draft.aiSuggestion,aiConfidence:draft.aiConfidence,scientificName:draft.scientificName,timeSource:draft.timeSource||null,locationSource:draft.locationSource||null,lengthIn:length?Number(length):null,weightLb:weight?Number(weight):null,lure:$('lure').value.trim(),notes:$('notes').value.trim(),createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};await putCatch(record);
+  // Commit is complete: send the authoritative saved GPS to the map immediately.
+  // Do not transfer photo data or request the phone's current location.
+  document.dispatchEvent(new CustomEvent('df-catches-changed',{detail:{
+    kind:old?'update':'save',id:record.id,
+    catch:{id:record.id,species:record.species,capturedAt:record.capturedAt,
+      latitude:record.latitude,longitude:record.longitude,locationSource:record.locationSource,
+      weather:record.weather,updatedAt:record.updatedAt}
+  }}));notify(editingId?'Catch updated.':'Catch saved to this device.');resetForm();await refreshStats();tab('gallery');}catch(e){notify('Saving failed: '+(e?.message||String(e))+'. Check device storage and try a smaller photo.',true);}finally{$('save-btn').disabled=false;}}
 async function refreshStats(){const data=await getAll();$('total-catches').textContent=String(data.length);$('total-species').textContent=String(new Set(data.map(x=>String(x.species||'').trim().toLowerCase()).filter(Boolean)).size);data.sort((a,b)=>Date.parse(b.capturedAt)-Date.parse(a.capturedAt));$('latest-date').textContent=data.length?shortDate(data[0].capturedAt):'—';}
 function node(tag,cls,content){const el=document.createElement(tag);if(cls)el.className=cls;if(content!==undefined)el.textContent=String(content);return el;}
 function appendInfo(parent,label,value){if(value===null||value===undefined||value==='')return;const p=node('p');const strong=node('strong',null,label+': ');p.append(strong,document.createTextNode(String(value)));parent.append(p);}
