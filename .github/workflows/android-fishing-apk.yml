@@ -37,6 +37,23 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+      - name: Declare Android location permissions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          source = manifest.read_text()
+          assert '<manifest' in source, 'Android manifest missing'
+          permissions = (
+              '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
+              '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n'
+          )
+          if 'android.permission.ACCESS_FINE_LOCATION' not in source:
+              source = source.replace('<application', permissions+'    <application', 1)
+          manifest.write_text(source)
+          assert 'android.permission.ACCESS_FINE_LOCATION' in manifest.read_text()
+          PY
       - name: Set Android version code
         shell: bash
         run: |
