@@ -162,7 +162,6 @@ async function loadMap(){
    .on('tileerror',()=>{if(++failures===2)$('df-map-status').textContent='Background map tiles unavailable. Saved GPS pins remain positioned; check internet access.';})
    .addTo(map);
   b.hidden=true;
-  await refresh();
   updateMarkers();invalidateMap();
  }catch(e){
   $('df-map-status').textContent='Unable to display map: '+e.message+'. Saved fishing locations remain listed below.';
@@ -174,7 +173,7 @@ function init(){
  const analytics=screen('analytics','Catch analytics','FISHING PATTERNS'),locations=screen('map','Fishing locations','YOUR WATER');
  const data=el('div');data.id='df-analytics-data';analytics.append(data);
  const mp=panel('Catch map');
- mp.append(el('p','df-privacy','The map is loaded on request. Its tiles are requested from OpenStreetMap and can reveal the areas you view to the map provider. Your catch records are not uploaded as a database.'));
+ mp.append(el('p','df-privacy','Opening the Map tab loads map tiles when online. Tiles come from OpenStreetMap and can reveal the area shown to the provider. Your catch database and photos are not uploaded.'));
  const provenance=el('p','df-privacy');provenance.id='df-map-source-note';
  provenance.textContent='Only coordinates in saved catch records are used for map pins. Current phone GPS is never read from the Map screen.';
  mp.append(provenance);
