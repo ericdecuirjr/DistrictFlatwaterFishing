@@ -1,9 +1,15 @@
 import {cpSync,existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {build} from 'esbuild';
+import sharp from 'sharp';
 const out='www';mkdirSync(out,{recursive:true});
-for(const file of ['index.html','app.js','styles.css','phase3.js','phase3.css','sw.js','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','android-diagnostics.js','photo-metadata.js','historical-weather.js']){
+for(const file of ['index.html','app.js','styles.css','phase3.js','phase3.css','sw.js','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','android-diagnostics.js','photo-metadata.js','historical-weather.js','branding-logo.svg']){
  if(!existsSync(file))throw Error('Missing '+file);
  cpSync(file,out+'/'+file);
+}
+// The PWA icon bitmaps are derived from the same SVG used for the app banner.
+const emblem=readFileSync('branding-logo.svg');
+for(const size of [192,512]){
+  await sharp(emblem,{density:300}).resize(size,size).png().toFile(out+'/icon-'+size+'.png');
 }
 let html=readFileSync(out+'/index.html','utf8');
 if(!html.includes('phase3.css'))html=html.replace('</head>','<link rel="stylesheet" href="./phase3.css" />\n</head>');
