@@ -1,19 +1,44 @@
-/* Native helper for sharing catch backups; existing IndexedDB schema stays unchanged. */
+/* Native APIs for the Android APK. No changes to IndexedDB record format. */
 import {Capacitor} from '@capacitor/core';
 import {Filesystem,Directory} from '@capacitor/filesystem';
 import {Share} from '@capacitor/share';
 import {Geolocation} from '@capacitor/geolocation';
+import {Camera,CameraSource,CameraResultType} from '@capacitor/camera';
+
 if(Capacitor.isNativePlatform()){
-  try{
-    const geo=navigator.geolocation;
-    if(geo){
-      geo.getCurrentPosition=(success,failure,opts)=>{
-        Geolocation.getCurrentPosition({enableHighAccuracy:opts?.enableHighAccuracy??true,timeout:opts?.timeout||15000})
-          .then(p=>success({coords:p.coords,timestamp:p.timestamp}))
-          .catch(e=>failure?.({code:1,message:e?.message||'Location unavailable'}));
-      };
+  const meaningfulError=e=>e?.message||e?.code||String(e);
+  window.DistrictFlatwaterNative={
+    isNative:true,
+    async pickPhoto(source){
+      const photo=await Camera.getPhoto({
+        source:source==='camera'?CameraSource.Camera:CameraSource.Photos,
+        resultType:CameraResultType.Uri,
+        quality:86,
+        width:1600,
+        correctOrientation:true,
+        allowEditing:false,
+        saveToGallery:false
+      });
+      if(!photo?.webPath)throw Error('Photo picker returned no readable image.');
+      const res=await fetch(photo.webPath);
+      if(!res.ok)throw Error('Could not read selected photograph (HTTP '+res.status+').');
+      const blob=await res.blob();
+      if(!blob.size)throw Error('Selected photograph is empty.');
+      const mime=blob.type||'image/jpeg';
+      return new File([blob], 'catch-photo.'+(mime==='image/png'?'png':'jpg'),{type:mime});
+    },
+    async getPosition(){
+      const status=await Geolocation.checkPermissions();
+      if(status.location!=='granted'&&status.coarseLocation!=='granted'){
+        const permission=await Geolocation.requestPermissions();
+        if(permission.location!=='granted'&&permission.coarseLocation!=='granted'){
+          throw Error('Location permission denied. Enable location for District Flatwater Fishing in Android Settings.');
+        }
+      }
+      return await Geolocation.getCurrentPosition({enableHighAccuracy:true,timeout:20000,maximumAge:0,enableLocationFallback:true});
     }
-  }catch(e){console.warn('Using WebView location API fallback',e);}
+  };
+
   document.addEventListener('DOMContentLoaded',()=>{
     const btn=document.getElementById('export-btn');
     if(!btn)return;
@@ -24,12 +49,12 @@ if(Capacitor.isNativePlatform()){
           const r=indexedDB.open('district-flatwater-catches-v1');
           r.onerror=()=>reject(r.error);
           r.onsuccess=()=>{
-            const db=r.result, tx=db.transaction('catches','readonly'), q=tx.objectStore('catches').getAll();
+            const db=r.result,tx=db.transaction('catches','readonly'),q=tx.objectStore('catches').getAll();
             q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error);
             tx.oncomplete=()=>db.close();
           };
         });
-        const b64=blob=>new Promise((resolve,reject)=>{
+        const base64=blob=>new Promise((resolve,reject)=>{
           const reader=new FileReader();
           reader.onload=()=>resolve(String(reader.result).split(',')[1]);
           reader.onerror=()=>reject(reader.error);
@@ -38,13 +63,15 @@ if(Capacitor.isNativePlatform()){
         const rows=[];
         for(const c of catches){
           const {photo,...details}=c;
-          rows.push({...details,photoDataUrl:'data:'+(photo.type||'image/jpeg')+';base64,'+await b64(photo)});
+          if(!(photo instanceof Blob))throw Error('Catch photo missing from local backup');
+          rows.push({...details,photoDataUrl:'data:'+(photo.type||'image/jpeg')+';base64,'+await base64(photo)});
         }
-        const data={application:'district-flatwater-fishing',formatVersion:1,exportedAt:new Date().toISOString(),catches:rows};
-        const name='district-flatwater-backup-'+new Date().toISOString().slice(0,10)+'.json';
-        const saved=await Filesystem.writeFile({path:name,data:await b64(new Blob([JSON.stringify(data)],{type:'application/json'})),directory:Directory.Cache,recursive:true});
-        await Share.share({title:'District Flatwater Fishing backup',url:saved.uri,dialogTitle:'Save or share your catch backup'});
-      }catch(e){alert('Export failed: '+(e.message||String(e)));}
+        const archive={application:'district-flatwater-fishing',formatVersion:1,exportedAt:new Date().toISOString(),catches:rows};
+        const file='district-flatwater-backup-'+new Date().toISOString().slice(0,10)+'.json';
+        const data=await base64(new Blob([JSON.stringify(archive)],{type:'application/json'}));
+        const saved=await Filesystem.writeFile({path:file,data,directory:Directory.Cache,recursive:true});
+        await Share.share({title:'District Flatwater Fishing backup',url:saved.uri,dialogTitle:'Save a copy of your catch backup'});
+      }catch(e){alert('Export failed: '+meaningfulError(e));}
       finally{btn.disabled=false;}
     },true);
   });
