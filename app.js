@@ -2,10 +2,10 @@
 (function districtFlatwaterCatchApp(){
 'use strict';
 if(window.__DF_CATCH_APP_BOOT) return;
-window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.5.0'};
+window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.6.0'};
 /* District Flatwater Fishing — Phase 1. No frameworks or tracking. */
 'use strict';
-const VERSION = '3.5.0';
+const VERSION = '3.6.0';
 const DB_NAME = 'district-flatwater-catches-v1';
 const STORE = 'catches';
 const nativeBridge = () => window.DistrictFlatwaterNative;
@@ -71,7 +71,21 @@ function getAll(){return new Promise((resolve,reject)=>{const req=db.transaction
 function getOne(id){return new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readonly').objectStore(STORE).get(id);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 function putCatch(record){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(record);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
 function removeCatch(id){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
-function tab(name){for(const n of ['log','gallery','settings','diagnostics']){$('screen-'+n).hidden=n!==name;const b=$('tab-'+n);b.classList.toggle('active',n===name);if(n===name)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');}if(name==='gallery')renderGallery();if(name==='log')$('species').focus({preventScroll:true});window.scrollTo({top:0,behavior:'smooth'});}
+function tab(name){
+  const requested=$('screen-'+name)?name:'log';
+  const navName=['settings','diagnostics'].includes(requested)?'more':requested;
+  document.querySelectorAll('main > .screen').forEach(screen=>{screen.hidden=screen.id!=='screen-'+requested;});
+  document.querySelectorAll('#app-bottom-nav .bottom-nav-item').forEach(button=>{
+    const active=button.dataset.tab===navName;
+    button.classList.toggle('active',active);
+    if(active)button.setAttribute('aria-current','page');
+    else button.removeAttribute('aria-current');
+  });
+  if(requested==='gallery')renderGallery();
+  if(requested==='log')$('species').focus({preventScroll:true});
+  document.dispatchEvent(new CustomEvent('df-tab-change',{detail:{name:requested}}));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
 function showNetwork(){const online=navigator.onLine;$('network-dot').classList.toggle('online',online);$('network-label').textContent=online?'Online':'Offline';}
 function updateLocationUI(){const lat=draft.latitude,lon=draft.longitude;$('location-value').textContent=Number.isFinite(lat)&&Number.isFinite(lon)?`${lat.toFixed(5)}, ${lon.toFixed(5)}`:'Not captured';$('weather-btn').disabled=!(Number.isFinite(lat)&&Number.isFinite(lon));const w=draft.weather;$('temperature-value').textContent=w&&Number.isFinite(w.temperatureF)?`${Math.round(w.temperatureF)} °F`:'—';$('pressure-value').textContent=w&&Number.isFinite(w.surfaceHpa)?`${(w.surfaceHpa*.0295299830714).toFixed(2)} inHg`:'—';$('conditions-value').textContent=w?.conditions||'—';$('forecast-value').hidden=!w?.forecast;$('forecast-value').textContent=w?.forecast||'';
   const valid=Number.isFinite(lat)&&Number.isFinite(lon);
