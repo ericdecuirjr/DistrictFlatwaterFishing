@@ -75,6 +75,7 @@ function tab(name){
   const requested=$('screen-'+name)?name:'log';
   const navName=['settings','diagnostics'].includes(requested)?'more':requested;
   document.querySelectorAll('main > .screen').forEach(screen=>{screen.hidden=screen.id!=='screen-'+requested;});
+  const intro=document.querySelector('main > .intro');if(intro)intro.hidden=requested!=='log';
   document.querySelectorAll('#app-bottom-nav .bottom-nav-item').forEach(button=>{
     const active=button.dataset.tab===navName;
     button.classList.toggle('active',active);
