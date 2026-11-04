@@ -58,5 +58,16 @@ function groupPins(records){
   }
   return [...groups.values()];
 }
-window.DistrictFlatwaterMapUtils={coordinate,pinKey,sourceLabel,sourceCounts,locations,groupPins};
+// Apply a confirmed transaction immediately, even before IndexedDB is read again.
+// Only the original saved coordinates are accepted. No phone GPS is consulted.
+function reconcileCommitted(records,change){
+  const previous=Array.isArray(records)?records:[];
+  if(!change||typeof change!=='object'||typeof change.id!=='string')return previous;
+  if(change.kind==='delete')return previous.filter(row=>row?.id!==change.id);
+  if(change.kind!=='save'&&change.kind!=='update')return previous;
+  const record=change.catch;
+  if(!record||record.id!==change.id)return previous;
+  return [...previous.filter(row=>row?.id!==change.id),record];
+}
+window.DistrictFlatwaterMapUtils={coordinate,pinKey,sourceLabel,sourceCounts,locations,groupPins,reconcileCommitted};
 })();
