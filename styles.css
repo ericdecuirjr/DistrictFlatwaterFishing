@@ -16,3 +16,25 @@
 .historical-weather-panel .metadata-summary{font-size:.83rem;line-height:1.5;overflow-wrap:anywhere;color:#315547;margin:10px 0}
 .historical-preview-details{white-space:pre-line;font-size:.83rem;line-height:1.6;background:white;border:1px solid #dfe8dd;border-radius:10px;padding:12px;color:#183d33}
 .historical-weather-panel .photo-buttons .button{flex:1;min-width:145px}
+
+/* District Flatwater Fishing branding: approved white bass badge on hunter green. */
+.masthead .brand img{background:#00380e;border:1px solid #ffffff40;border-radius:11px;padding:1px;object-fit:contain}
+.intro{display:grid;grid-template-columns:minmax(0,1fr) minmax(145px,240px);align-items:center;gap:18px;background:linear-gradient(125deg,#00380e 0%,#114b2b 58%,#073a20 100%)}
+.intro::after{content:none}
+.intro-copy{min-width:0;position:relative;z-index:1}
+.intro-emblem{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:contain;border-radius:50%;box-shadow:0 9px 30px #001b1033}
+.intro .eyebrow{color:#e9d9a2}
+.intro h1 em{color:#f3d18b}
+@media(max-width:700px){
+  .intro{grid-template-columns:minmax(0,1fr) 102px;gap:10px;align-items:start;padding:21px 18px}
+  .intro h1{font-size:clamp(1.4rem,5vw,1.85rem)}
+  .intro .stats{gap:14px;flex-wrap:wrap;margin-top:18px}
+  .intro .stats strong{font-size:1.15rem}
+  .intro-emblem{width:102px}
+}
+@media(max-width:410px){
+  .intro{grid-template-columns:1fr;gap:10px}
+  .intro-emblem{width:126px;grid-row:1;justify-self:center}
+  .intro-copy{grid-row:2;text-align:center}
+  .intro .stats{justify-content:center}
+}
