@@ -189,7 +189,7 @@ function init(){
  locations.append(mp);
  const search=panel('Saved fishing locations'),label=el('label','','Filter by species'),input=el('input');
  label.htmlFor='df-map-search';input.id='df-map-search';input.placeholder='e.g. Largemouth bass';
- const list=el('div','df-map-list');search.append(label,input,list);locations.append(search);
+ const list=el('div','df-map-list');list.id='df-map-list';search.append(label,input,list);locations.append(search);
  main.insertBefore(analytics,$('screen-settings'));main.insertBefore(locations,$('screen-settings'));
  $('df-load-map').addEventListener('click',loadMap);
  input.addEventListener('input',renderLocations);
