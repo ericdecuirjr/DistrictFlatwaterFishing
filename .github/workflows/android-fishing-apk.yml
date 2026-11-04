@@ -38,12 +38,15 @@ jobs:
           node --check phase3.js
           node --check native-bridge.mjs
           node --check build-web.mjs
+          node --check generate-android-icons.mjs
       - name: Build web content
         run: npm run build:web
       - name: Create Android project
         run: |
           npx cap add android
           npx cap sync android
+      - name: Install District Flatwater launcher artwork
+        run: node generate-android-icons.mjs
       - name: Declare Android location permissions
         shell: bash
         run: |
