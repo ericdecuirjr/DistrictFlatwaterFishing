@@ -31,3 +31,14 @@
 .df-map-popup>div{margin-top:3px}
 #df-refresh-map{margin:10px 0 0}
 #df-map{min-height:350px;background:#e0e8de}
+
+/* v3.7.1 saved-location audit and map pin correction tools. */
+.df-map-item-controls{display:flex;gap:7px;align-items:center;justify-content:flex-end;flex-wrap:wrap;max-width:170px}
+.df-map-item-controls .button{font-size:.72rem;padding:8px;min-height:36px}
+.df-map-item-controls a{font-size:.72rem;white-space:normal}
+.df-map-item small{overflow-wrap:anywhere}
+#df-map-source-note{padding:8px 10px;background:#eaf3eb;border-radius:10px;color:#264f39}
+@media(max-width:450px){
+ .df-map-item{flex-direction:column}
+ .df-map-item-controls{justify-content:flex-start;max-width:100%}
+}
