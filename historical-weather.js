@@ -53,7 +53,7 @@ function extract(json,iso){
   let best=-1,difference=Infinity;
   for(let i=0;i<hourly.time.length;i++){
     const sec=Number(hourly.time[i]);
-    if(!Number.isFinite(sec)||sec<0)continue;
+    if(!Number.isFinite(sec))continue;
     const diff=Math.abs(sec*1000-target);
     if(diff<difference){best=i;difference=diff;}
   }
