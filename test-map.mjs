@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
 const sandbox={window:{},Map,Number,String,Date,Array,Math};
 vm.runInNewContext(readFileSync('map-utils.js','utf8'),sandbox,{filename:'map-utils.js'});
-const {coordinate,locations,groupPins}=sandbox.window.DistrictFlatwaterMapUtils;
+const {coordinate,locations,groupPins,sourceCounts,sourceLabel,pinKey}=sandbox.window.DistrictFlatwaterMapUtils;
 assert.equal(coordinate(0,90),0);
 assert.equal(coordinate('-77.0353',180),-77.0353);
 assert.equal(coordinate('38.8895',90),38.8895);
@@ -42,14 +42,14 @@ const sourceRows=locations([
  {id:'phone',species:'Bass',latitude:40,longitude:-75,locationSource:'phone'},
  {id:'legacy',species:'Bass',latitude:45,longitude:-70}
 ]);
-const provenance=window.DistrictFlatwaterMapUtils.sourceCounts(sourceRows);
+const provenance=sourceCounts(sourceRows);
 assert.equal(provenance.photoExif,1);
 assert.equal(provenance.manual,1);
 assert.equal(provenance.phone,1);
 assert.equal(provenance.unspecified,1);
-assert.equal(window.DistrictFlatwaterMapUtils.sourceLabel('phone'),'Phone GPS at time of logging');
-assert.equal(window.DistrictFlatwaterMapUtils.pinKey(39.25,-76.75),'39.250000,-76.750000');
-assert.equal(window.DistrictFlatwaterMapUtils.pinKey(null,-76.75),null);
+assert.equal(sourceLabel('phone'),'Phone GPS at time of logging');
+assert.equal(pinKey(39.25,-76.75),'39.250000,-76.750000');
+assert.equal(pinKey(null,-76.75),null);
 const stage=readFileSync('phase3.js','utf8');
 const logging=readFileSync('app.js','utf8');
 assert.ok(!stage.includes('navigator.geolocation')&&!stage.includes('getCurrentPosition'),'Map never requests live phone GPS');
