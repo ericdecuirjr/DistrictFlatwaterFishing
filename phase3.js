@@ -22,12 +22,76 @@ root.append(chart('Catches by month',months.sort((a,b)=>a[0].localeCompare(b[0])
 root.append(chart('Time of day',counts(catches,c=>{const d=new Date(c.capturedAt);return Number.isNaN(d.getTime())?null:String(d.getHours()).padStart(2,'0')+':00';}).sort((a,b)=>a[0].localeCompare(b[0]))));
 const ranges=[['Below 29.80',0],['29.80–29.99',0],['30.00–30.19',0],['30.20 and above',0]];for(const c of pressure){const x=c.weather.surfaceHpa*0.0295299830714;ranges[x<29.8?0:x<30?1:x<30.2?2:3][1]++;}root.append(chart('Catches by surface pressure (inHg)',ranges));root.append(el('p','df-analysis-note','Charts count logged catches only. They do not establish that particular times, weather conditions, or pressure readings cause fish to bite. Weather values are model estimates.'));
 }
-function filteredLocations(){const query=($('df-map-search')?.value||'').trim().toLowerCase();return catches.filter(c=>Number.isFinite(c.latitude)&&Number.isFinite(c.longitude)&&(!query||String(c.species||'').toLowerCase().includes(query))).sort((a,b)=>Date.parse(b.capturedAt)-Date.parse(a.capturedAt));}
-function renderLocations(){const list=$('df-map-list');if(!list)return;list.replaceChildren();const rows=filteredLocations();$('df-map-status').textContent=rows.length+' geotagged catch'+(rows.length===1?'':'es')+' match. The interactive map needs internet; your catch list works offline.';if(!rows.length)list.append(el('div','df-empty','No GPS-tagged catches match yet. Enable location when logging a fish.'));for(const c of rows.slice(0,100)){const item=el('div','df-map-item'),info=el('div');info.append(el('strong','',c.species||'Unidentified fish'),el('small','',niceDate(c.capturedAt)+' · '+c.latitude.toFixed(4)+', '+c.longitude.toFixed(4)));const link=el('a','', 'Open Maps');link.href='https://www.google.com/maps?q='+encodeURIComponent(c.latitude+','+c.longitude);link.target='_blank';link.rel='noopener noreferrer';item.append(info,link);list.append(item);}if(rows.length>100)list.append(el('p','df-analysis-note','Showing the 100 most recent matches.'));if(map)updateMarkers();}
+function filteredLocations(){return window.DistrictFlatwaterMapUtils.locations(catches,($('df-map-search')?.value||'').trim());}
+function renderLocations(){
+ const list=$('df-map-list');if(!list)return;list.replaceChildren();
+ const rows=filteredLocations(),groups=window.DistrictFlatwaterMapUtils.groupPins(rows);
+ $('df-map-status').textContent=rows.length+' geotagged catch'+(rows.length===1?'':'es')+' at '+groups.length+' distinct location'+(groups.length===1?'':'s')+'. '+(map?'Pins show the saved GPS locations.':'Tap Load interactive map to show pins.');
+ if(!rows.length)list.append(el('div','df-empty','No GPS-tagged catches match. Check the saved coordinates.'));
+ for(const c of rows.slice(0,100)){
+  const item=el('div','df-map-item'),info=el('div');
+  info.append(el('strong','',c.species||'Unidentified fish'),el('small','',niceDate(c.capturedAt)+' · '+c.latitude.toFixed(5)+', '+c.longitude.toFixed(5)));
+  const link=el('a','', 'Open Maps');link.href='https://www.google.com/maps?q='+encodeURIComponent(c.latitude+','+c.longitude);
+  link.target='_blank';link.rel='noopener noreferrer';item.append(info,link);list.append(item);
+ }
+ if(rows.length>100)list.append(el('p','df-analysis-note','Showing 100 recent catches in the list; the map includes every valid GPS-tagged catch.'));
+ if(map)updateMarkers();
+}
 function addStyle(url){return new Promise((resolve,reject)=>{const tag=el('link');tag.rel='stylesheet';tag.href=url;tag.onload=resolve;tag.onerror=reject;document.head.append(tag);});}
 function addScript(url){return new Promise((resolve,reject)=>{const tag=el('script');tag.src=url;tag.onload=resolve;tag.onerror=reject;document.head.append(tag);});}
-function updateMarkers(){if(!map||!window.L)return;if(markers)map.removeLayer(markers);const rows=filteredLocations().slice(0,1000);markers=L.featureGroup(rows.map(c=>{const m=L.marker([c.latitude,c.longitude]),popup=el('div');popup.append(el('strong','',c.species||'Catch'),el('div','',niceDate(c.capturedAt)));m.bindPopup(popup);return m;})).addTo(map);if(rows.length)map.fitBounds(markers.getBounds().pad(.18),{maxZoom:13});}
-async function loadMap(){if(loadingMap||map)return;loadingMap=true;const b=$('df-load-map');b.disabled=true;b.textContent='Loading map...';try{if(!navigator.onLine)throw Error('Internet connection needed to load map tiles');await addStyle('https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');await addScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');map=L.map('df-map',{scrollWheelZoom:false}).setView([39.3,-76.6],8);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);updateMarkers();setTimeout(()=>map.invalidateSize(),150);b.hidden=true;}catch(e){$('df-map-status').textContent='Unable to load map: '+e.message;b.disabled=false;b.textContent='Try loading map again';}finally{loadingMap=false;}}
+function updateMarkers(){
+ if(!map||!window.L)return;
+ if(markers)map.removeLayer(markers);
+ markers=L.featureGroup();
+ const groups=window.DistrictFlatwaterMapUtils.groupPins(filteredLocations());
+ for(const group of groups){
+  const count=group.items.length;
+  const icon=L.divIcon({className:'df-location-icon',
+   html:'<span class="df-map-pin" aria-hidden="true">'+(count>1?String(count):'●')+'</span>',
+   iconSize:[34,42],iconAnchor:[17,38],popupAnchor:[0,-32]});
+  const marker=L.marker([group.latitude,group.longitude],{icon});
+  const popup=el('div','df-map-popup');
+  popup.append(el('strong','',count+' catch'+(count===1?'':'es')+' at this spot'),el('div','',group.latitude.toFixed(5)+', '+group.longitude.toFixed(5)));
+  for(const record of group.items.slice(0,12))popup.append(el('div','',(record.species||'Unidentified fish')+' · '+niceDate(record.capturedAt)));
+  if(count>12)popup.append(el('div','',(count-12)+' additional catches at this spot'));
+  marker.bindPopup(popup);markers.addLayer(marker);
+ }
+ markers.addTo(map);
+ if(groups.length===1)map.setView([groups[0].latitude,groups[0].longitude],13);
+ else if(groups.length>1)map.fitBounds(markers.getBounds().pad(.22),{maxZoom:14});
+ else map.setView([0,0],2);
+ invalidateMap();
+}
+function invalidateMap(){
+ if(!map)return;
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{if(map)map.invalidateSize({pan:false});}));
+}
+async function loadMap(){
+ if(loadingMap)return;
+ if(map){await refresh();invalidateMap();return;}
+ loadingMap=true;
+ const b=$('df-load-map');b.disabled=true;b.textContent='Loading map...';
+ try{
+  // Native APK bundles Leaflet so marker rendering does not depend on an external JS CDN.
+  if(!window.L){
+   const local=!!window.DistrictFlatwaterNative;
+   await addStyle(local?'./vendor/leaflet.css':'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css');
+   await addScript(local?'./vendor/leaflet.js':'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js');
+  }
+  if(!window.L)throw Error('Map library did not initialize');
+  map=L.map('df-map',{scrollWheelZoom:false,zoomControl:true}).setView([0,0],2);
+  let failures=0;
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'})
+   .on('tileerror',()=>{if(++failures===2)$('df-map-status').textContent='Background map tiles unavailable. Saved GPS pins remain positioned; check internet access.';})
+   .addTo(map);
+  b.hidden=true;
+  await refresh();
+  updateMarkers();invalidateMap();
+ }catch(e){
+  $('df-map-status').textContent='Unable to display map: '+e.message+'. Saved fishing locations remain listed below.';
+  b.disabled=false;b.textContent='Try loading map again';
+ }finally{loadingMap=false;}
+}
 function init(){
  const main=document.querySelector('main');if(!main)return;
  const analytics=screen('analytics','Catch analytics','FISHING PATTERNS'),locations=screen('map','Fishing locations','YOUR WATER');
@@ -43,9 +107,10 @@ function init(){
  main.insertBefore(analytics,$('screen-settings'));main.insertBefore(locations,$('screen-settings'));
  $('df-load-map').addEventListener('click',loadMap);
  input.addEventListener('input',renderLocations);
+ const reload=button('df-refresh-map','Refresh saved locations','button secondary compact');reload.addEventListener('click',refresh);search.append(reload);
  document.addEventListener('df-tab-change',event=>{
    if(event.detail?.name==='analytics')renderAnalytics();
-   if(event.detail?.name==='map'){renderLocations();if(map)window.setTimeout(()=>map.invalidateSize(),120);}
+   if(event.detail?.name==='map'){refresh();invalidateMap();}
  });
  $('tab-gallery')?.addEventListener('click',refresh);
  $('save-btn')?.addEventListener('click',()=>setTimeout(refresh,600));
