@@ -51,3 +51,39 @@
 .gps-entry .photo-buttons>.button{flex:1;min-width:136px}
 .gps-entry #gps-source{color:#295d3a;font-weight:700}
 @media(prefers-reduced-motion:reduce){.df-launch-splash{transition:none}}
+
+/* v3.6 fixed five-destination navigation. Works on Galaxy and standalone PWAs. */
+:root{--df-nav-height:68px;--df-nav-safe:env(safe-area-inset-bottom,0px)}
+body{padding-bottom:calc(var(--df-nav-height) + var(--df-nav-safe))}
+main{padding-bottom:38px}
+footer{padding-bottom:18px}
+.bottom-nav{
+ position:fixed;bottom:0;left:0;right:0;z-index:120;
+ min-height:calc(var(--df-nav-height) + var(--df-nav-safe));
+ padding:5px max(8px,env(safe-area-inset-left,0px)) calc(5px + var(--df-nav-safe)) max(8px,env(safe-area-inset-right,0px));
+ display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch;
+ background:#fff;border-top:1px solid #d9e6dc;box-shadow:0 -4px 20px #072b171a;
+}
+.bottom-nav-item{
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+ border:0;border-radius:12px;background:transparent;color:#506e5c;
+ min-width:0;min-height:54px;padding:6px 3px;font-size:.7rem;font-weight:750;line-height:1.15;
+}
+.bottom-nav-item svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.bottom-nav-item.active{background:#e5f0e7;color:#124d2e}
+.bottom-nav-item.active svg{stroke-width:2.4}
+.bottom-nav-item:focus-visible,.more-option:focus-visible{outline:3px solid #c59b32;outline-offset:-3px}
+.more-navigation{display:grid;gap:12px}
+.more-option{
+ display:flex;align-items:center;gap:14px;width:100%;min-height:80px;text-align:left;
+ border:1px solid #d9e6dc;border-radius:16px;background:#fff;color:#244d36;padding:16px;
+}
+.more-option-icon{width:42px;height:42px;flex:none;display:grid;place-items:center;background:#e6f0e8;border-radius:12px;font-size:1.4rem}
+.more-option-copy{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.more-option-copy strong{font-size:.97rem}
+.more-option-copy small{font-size:.78rem;color:#627a6e}
+.more-chevron{font-size:1.75rem;color:#718f7c}
+@media(max-width:400px){
+ .bottom-nav-item{font-size:.65rem}
+ .bottom-nav-item svg{width:21px;height:21px}
+}
