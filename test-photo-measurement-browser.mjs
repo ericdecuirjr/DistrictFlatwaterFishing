@@ -36,5 +36,17 @@ try {
  if(await evaluate("document.querySelector('[data-role=dimension]').value")!=='4')throw Error('Reference dimension not restored');
  await fill('[data-role=zoom]','200');await click('[data-role=pan]');await writeFile('measure-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));await click('[data-role=cancel]');
  await fill('#length','17');await click('#save-btn');await wait("document.querySelector('.catch-card')?.textContent.includes('17 in')");if(await evaluate("document.querySelector('.catch-card').textContent.includes('~17')"))throw Error('Manual edit retained estimated label');
+ for(const [width,height] of [[500,1600],[1600,500]]){
+  await click('#new-from-gallery');
+  await evaluate(`(async()=>{const c=document.createElement('canvas');c.width=${width};c.height=${height};c.getContext('2d').fillRect(0,0,c.width,c.height);const blob=await new Promise(r=>c.toBlob(r,'image/png'));const dt=new DataTransfer();dt.items.add(new File([blob],'fit-test.png',{type:'image/png'}));const e=document.querySelector('#upload-input');e.files=dt.files;e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await wait("!document.querySelector('#measure-photo').disabled");await click('#measure-photo');await wait("!!document.querySelector('[data-role=overlay]')");
+  await click('[data-role=zoom-in]');await wait("document.querySelector('[data-role=zoom]').value==='125'");
+  await click('[data-role=zoom-out]');await wait("document.querySelector('[data-role=zoom]').value==='100'");
+  await click('[data-role=zoom-out]');await wait("document.querySelector('[data-role=zoom]').value==='75'");
+  await click('[data-role=fit]');await wait("document.querySelector('[data-role=zoom-value]').textContent==='100%'");
+  await wait("(()=>{const v=document.querySelector('[data-role=viewport]'),s=document.querySelector('[data-role=surface]').getBoundingClientRect();return s.width<=v.clientWidth+1&&s.height<=v.clientHeight+1&&s.width>0&&s.height>0&&v.scrollTop===0&&v.scrollLeft===0;})()");
+  if(width<height)await writeFile('measure-fit-portrait.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+  console.log('Whole photo fit and button zoom passed:',width,height);await click('[data-role=cancel]');
+ }
  if(errors.length)throw Error(errors.join('; '));console.log('Mobile upload, endpoints, save, reload, restored measurement, zoom, pan, cancel and manual override passed');
 } finally {clearTimeout(timer);ws?.close();chrome?.kill('SIGKILL');server.closeAllConnections();server.close();}

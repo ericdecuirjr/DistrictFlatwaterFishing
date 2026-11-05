@@ -9,10 +9,11 @@ export async function measurePhoto(blob, previous) {
     <label>Reference object <select data-role="preset"><option value="custom">Custom / lure / boat detail</option><option value="3.375">Standard payment card — long edge, 3.375 in</option><option value="0.955">US quarter — diameter, 0.955 in</option></select></label>
     <label>Known distance <input data-role="dimension" type="number" min="0" step="any" inputmode="decimal"></label>
     <label>Units <select data-role="unit"><option value="in">Inches</option><option value="cm">Centimeters</option></select></label>
-    <label>Zoom <input data-role="zoom" type="range" min="100" max="400" step="25" value="100"></label>
+    <label>Zoom <output data-role="zoom-value">100%</output><input data-role="zoom" aria-label="Photo zoom" type="range" min="25" max="400" step="25" value="100" style="padding:0;height:44px;touch-action:pan-y"></label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" data-role="zoom-out" aria-label="Zoom out" style="min-width:48px;min-height:44px">−</button><button type="button" data-role="fit" style="min-height:44px">Fit photo</button><button type="button" data-role="zoom-in" aria-label="Zoom in" style="min-width:48px;min-height:44px">+</button></div>
     <label><input data-role="pan" type="checkbox" style="width:auto;padding:0"> Pan photo while zoomed</label><p>Select an endpoint below, then tap its position on the photo. Drag a marker to adjust it. Arrow keys move the selected marker; Shift moves it farther.</p>
     <div data-role="points" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-    <div data-role="viewport" style="overflow:auto;overflow-anchor:none;max-height:45dvh;border:1px solid #758579;margin-top:12px"><div data-role="surface" style="position:relative;width:100%;line-height:0"><img alt="Catch photo for measurement" style="display:block;width:100%;height:auto"><svg data-role="overlay" tabindex="0" role="application" aria-label="Photo endpoint editor" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none"></svg></div></div>
+    <div data-role="viewport" style="overflow:auto;overflow-anchor:none;height:40dvh;max-height:45dvh;border:1px solid #758579;margin-top:12px"><div data-role="surface" style="position:relative;width:100%;line-height:0;margin-inline:auto"><img alt="Catch photo for measurement" style="display:block;width:100%;height:auto"><svg data-role="overlay" tabindex="0" role="application" aria-label="Photo endpoint editor" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none"></svg></div></div>
     <p data-role="status" aria-live="polite" style="min-height:4em"></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button data-role="apply" type="button">Use estimated length</button><button data-role="reset" type="button">Reset points</button><button data-role="cancel" type="button">Cancel</button></div>`;
   const q=r=>dialog.querySelector('[data-role="'+r+'"]');
   dialog.querySelector('img').src=url;
@@ -40,14 +41,25 @@ export async function measurePhoto(blob, previous) {
   q('preset').onchange=()=>{if(q('preset').value!=='custom'){q('dimension').value=q('preset').value;q('unit').value='in';}render();};
   q('dimension').oninput=render;q('unit').onchange=render;
   q('pan').onchange=()=>{q('overlay').style.pointerEvents=q('pan').checked?'none':'auto';};
-  q('zoom').oninput=()=>{q('surface').style.width=q('zoom').value+'%';render();};
+  function updateZoom(){
+    const viewport=q('viewport'),zoom=Number(q('zoom').value);
+    // 100% fits the WHOLE photo in both dimensions, including tall portraits.
+    const fitWidth=Math.min(viewport.clientWidth,viewport.clientHeight*image.naturalWidth/image.naturalHeight);
+    q('surface').style.width=Math.max(1,fitWidth*zoom/100)+'px';
+    q('zoom-value').textContent=zoom+'%';
+    render();
+  }
+  q('zoom').oninput=updateZoom;
+  q('zoom-out').onclick=()=>{q('zoom').value=Math.max(25,Number(q('zoom').value)-25);updateZoom();};
+  q('zoom-in').onclick=()=>{q('zoom').value=Math.min(400,Number(q('zoom').value)+25);updateZoom();};
+  q('fit').onclick=()=>{q('zoom').value=100;updateZoom();q('viewport').scrollTo(0,0);};
   q('reset').onclick=()=>{points=[null,null,null,null];selected=0;render();};
   document.body.append(dialog);
   return new Promise(resolve=>{
-    const observer=new ResizeObserver(render);observer.observe(q('surface'));
+    const observer=new ResizeObserver(updateZoom);observer.observe(q('viewport'));observer.observe(q('surface'));
     dialog.addEventListener('close',()=>{observer.disconnect();URL.revokeObjectURL(url);dialog.remove();resolve(result);},{once:true});
     q('cancel').onclick=()=>dialog.close();
     q('apply').onclick=()=>{try{result=calculate();dialog.close();}catch(e){q('status').textContent=e.message;}};
-    dialog.showModal();render();
+    dialog.showModal();updateZoom();
   });
 }

@@ -2,7 +2,7 @@ name: Build District Flatwater Fishing APK
 on:
   workflow_dispatch:
   push:
-    branches: [feature/photo-reference-measurement]
+    branches: [feature/photo-reference-measurement, fix/photo-zoom-fit]
 permissions:
   contents: read
 jobs:
@@ -67,7 +67,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Photo-Measurement-Mobile-Preview
-          path: measure-mobile.png
+          path: |
+            measure-mobile.png
+            measure-fit-portrait.png
           if-no-files-found: ignore
       - name: Create Android project
         run: |
