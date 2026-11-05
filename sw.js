@@ -1,4 +1,4 @@
-const CACHE = 'district-flatwater-shell-v14';
+const CACHE = 'district-flatwater-shell-v15';
 const SHELL = ['./photo-measurement.mjs', './photo-measurement-ui.mjs', './', './index.html', './styles.css', './phase3.css', './phase3.js', './app.js', './photo-metadata.js', './historical-weather.js', './manifest.webmanifest', './icon.svg', './branding-logo.svg', './gps-coordinates.js', './splash.js', './map-utils.js', './icon-192.png', './icon-512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('district-flatwater-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
