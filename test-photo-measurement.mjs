@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {estimateFishLength as calc} from './photo-measurement.mjs';
+const input={referencePoints:[{x:.1,y:.2},{x:.3,y:.2}],fishPoints:[{x:.1,y:.6},{x:.9,y:.6}],referenceLength:4,unit:'in',imageWidth:1000,imageHeight:500};
+assert.ok(Math.abs(calc(input).length-16)<1e-9);
+assert.equal(calc({...input,imageWidth:2000,imageHeight:1000}).length,calc(input).length);
+assert.ok(Math.abs(calc({...input,referenceLength:10.16,unit:'cm'}).length/2.54-16)<1e-9);
+assert.ok(Math.abs(calc({...input,fishPoints:[{x:.1,y:.2},{x:.1,y:1}]}).length-8)<1e-9);
+for(const bad of [{referenceLength:0},{referenceLength:-1},{referenceLength:NaN},{imageWidth:0},{unit:'ft'},{referencePoints:[{x:.1,y:.2},{x:.1,y:.2}]},{fishPoints:[null,null]},{fishPoints:[{x:-1,y:0},{x:1,y:1}]}])assert.throws(()=>calc({...input,...bad}));
+const m=calc(input);m.referencePoints[0].x=.8;assert.equal(input.referencePoints[0].x,.1);
+assert.deepEqual(calc(JSON.parse(JSON.stringify(input))),calc(input));
+console.log('Photo measurement ratio, aspect ratio, scaling, units, validation and saved points passed');
