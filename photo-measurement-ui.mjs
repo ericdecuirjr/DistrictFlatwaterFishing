@@ -10,7 +10,7 @@ export async function measurePhoto(blob, previous) {
     <label>Known distance <input data-role="dimension" type="number" min="0" step="any" inputmode="decimal"></label>
     <label>Units <select data-role="unit"><option value="in">Inches</option><option value="cm">Centimeters</option></select></label>
     <label>Zoom <input data-role="zoom" type="range" min="100" max="400" step="25" value="100"></label>
-    <label><input data-role="pan" type="checkbox"> Pan photo while zoomed</label><p>Select an endpoint below, then tap its position on the photo. Drag a marker to adjust it. Arrow keys move the selected marker; Shift moves it farther.</p>
+    <label><input data-role="pan" type="checkbox" style="width:auto;padding:0"> Pan photo while zoomed</label><p>Select an endpoint below, then tap its position on the photo. Drag a marker to adjust it. Arrow keys move the selected marker; Shift moves it farther.</p>
     <div data-role="points" style="display:flex;flex-wrap:wrap;gap:6px"></div>
     <div data-role="viewport" style="overflow:auto;max-height:45dvh;border:1px solid #758579;margin-top:12px"><div data-role="surface" style="position:relative;width:100%;line-height:0"><img alt="Catch photo for measurement" style="display:block;width:100%;height:auto"><svg data-role="overlay" tabindex="0" role="application" aria-label="Photo endpoint editor" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none"></svg></div></div>
     <p data-role="status" aria-live="polite"></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button data-role="apply" type="button">Use estimated length</button><button data-role="reset" type="button">Reset points</button><button data-role="cancel" type="button">Cancel</button></div>`;
