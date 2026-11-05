@@ -37,7 +37,7 @@ try {
  await fill('[data-role=zoom]','200');await click('[data-role=pan]');await writeFile('measure-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));await click('[data-role=cancel]');
  await fill('#length','17');await click('#save-btn');await wait("document.querySelector('.catch-card')?.textContent.includes('17 in')");if(await evaluate("document.querySelector('.catch-card').textContent.includes('~17')"))throw Error('Manual edit retained estimated label');
  for(const [width,height] of [[500,1600],[1600,500]]){
-  await click('#new-from-gallery');
+  await click('[data-tab=gallery]');await click('#new-from-gallery');
   await evaluate(`(async()=>{const c=document.createElement('canvas');c.width=${width};c.height=${height};c.getContext('2d').fillRect(0,0,c.width,c.height);const blob=await new Promise(r=>c.toBlob(r,'image/png'));const dt=new DataTransfer();dt.items.add(new File([blob],'fit-test.png',{type:'image/png'}));const e=document.querySelector('#upload-input');e.files=dt.files;e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
   await wait("!document.querySelector('#measure-photo').disabled");await click('#measure-photo');await wait("!!document.querySelector('[data-role=overlay]')");
   await click('[data-role=zoom-in]');await wait("document.querySelector('[data-role=zoom]').value==='125'");
