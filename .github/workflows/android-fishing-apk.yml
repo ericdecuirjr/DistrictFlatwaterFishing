@@ -61,8 +61,6 @@ jobs:
         run: npm run build:web
       - name: Test photo measurement on mobile browser
         run: |
-          npm install --no-save --no-audit --no-fund playwright
-          npx playwright install --with-deps chromium
           timeout 120s node test-photo-measurement-browser.mjs
       - name: Upload measurement preview
         if: always()

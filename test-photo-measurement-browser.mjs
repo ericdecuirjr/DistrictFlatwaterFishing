@@ -1,16 +1,39 @@
-import {chromium} from 'playwright';
 import {createServer} from 'node:http';
-import {readFile} from 'node:fs/promises';
-const server=createServer(async(req,res)=>{try{const path=new URL(req.url,'http://localhost').pathname;const ext=path==='/'?'html':path.split('.').pop();res.setHeader('Content-Type',({js:'text/javascript',mjs:'text/javascript',html:'text/html',css:'text/css'})[ext]||'application/octet-stream');res.end(await readFile('www'+(path==='/'?'/index.html':path)));}catch{res.writeHead(404);res.end();}});
-await new Promise(resolve=>server.listen(8765,'127.0.0.1',resolve));
-setTimeout(()=>{console.error('Mobile check exceeded 90 seconds');process.exit(1);},90000).unref();
-(async()=>{const browser=await chromium.launch({headless:true,args:['--no-sandbox']});const page=await browser.newPage({viewport:{width:390,height:844}});page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:8765')?route.continue():route.abort());
-console.log('Opening packaged app');await page.goto('http://127.0.0.1:8765');await page.waitForFunction(()=>window.__DF_CATCH_APP_BOOT?.initialized);
-console.log('Uploading sample photo');await page.locator('#upload-input').setInputFiles({name:'measurement.png',mimeType:'image/png',buffer:Buffer.from(await page.evaluate(()=>{const c=document.createElement('canvas');c.width=1000;c.height=500;const ctx=c.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,1000,500);return c.toDataURL().split(',')[1];}),'base64')});await page.waitForFunction(()=>!document.querySelector('#measure-photo').disabled);await page.locator('#measure-photo').click();
-console.log('Opening measurement editor');const dialog=page.locator('dialog').filter({has:page.locator('h2', {hasText:'Measure fish'})});await dialog.waitFor({state:'visible'});await dialog.locator('[data-role=dimension]').fill('4');
-let svg=dialog.locator('svg');await svg.scrollIntoViewIfNeeded();let rect=await svg.boundingBox();for(const [x,y] of [[.1,.2],[.3,.2],[.1,.6],[.9,.6]])await page.mouse.click(rect.x+rect.width*x,rect.y+rect.height*y);
-console.log('Checking calculated length');await page.locator('[data-role=status]').filter({hasText:'16.0 in'}).waitFor();await dialog.locator('[data-role=apply]').click();if(await page.locator('#length').inputValue()!=='16')throw Error('Wrong applied length');
-console.log('Saving measured catch');await page.locator('#species').fill('Test bass');await page.locator('#save-btn').click();await page.locator('.catch-card').waitFor();if(!(await page.locator('.catch-card').innerText()).includes('~16 in'))throw Error('Missing estimated label');
-console.log('Reloading saved catch');await page.reload();await page.waitForFunction(()=>window.__DF_CATCH_APP_BOOT?.initialized);await page.locator('[data-tab=gallery]').first().click();await page.locator('.catch-card button').filter({hasText:'Edit'}).click();await page.locator('#measure-photo').click();await dialog.waitFor({state:'visible'});if(await dialog.locator('[data-role=dimension]').inputValue()!=='4')throw Error('Reference not restored');await dialog.locator('[data-role=status]').filter({hasText:'16.0 in'}).waitFor();
-await dialog.locator('[data-role=zoom]').fill('200');await page.screenshot({path:'measure-mobile.png'});await dialog.locator('[data-role=cancel]').click();await page.locator('#length').fill('17');await page.locator('#save-btn').click();await page.locator('.catch-card').waitFor();if((await page.locator('.catch-card').innerText()).includes('~17'))throw Error('Manual edit retained estimated label');
-if(errors.length)throw Error(errors.join('; '));console.log('Mobile browser: upload, endpoints, 16-inch estimate, save, reload, restore, zoom, cancel, manual override passed');await browser.close();})().finally(()=>server.close());
+import {readFile,writeFile,mkdtemp} from 'node:fs/promises';
+import {spawn,spawnSync} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+const server=createServer(async(req,res)=>{try{const path=new URL(req.url,'http://localhost').pathname;const ext=path==='/'?'html':path.split('.').pop();res.setHeader('Content-Type',({js:'text/javascript',mjs:'text/javascript',html:'text/html',css:'text/css',svg:'image/svg+xml',png:'image/png'})[ext]||'application/octet-stream');res.end(await readFile('www'+(path==='/'?'/index.html':path)));}catch{res.writeHead(404);res.end();}});
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const timer=setTimeout(()=>{console.error('Mobile browser check exceeded 90 seconds');process.exit(1);},90000);timer.unref();
+let chrome,ws;
+try {
+ await new Promise(resolve=>server.listen(8765,'127.0.0.1',resolve));
+ const executable=['google-chrome','chromium','chromium-browser'].find(x=>spawnSync('which',[x]).status===0);
+ if(!executable)throw Error('Chrome is required for the mobile browser check');
+ chrome=spawn(executable,['--headless','--no-sandbox','--disable-dev-shm-usage','--remote-debugging-port=9222','--user-data-dir='+await mkdtemp(join(tmpdir(),'df-test-')),'about:blank'],{stdio:'ignore'});
+ let targets;for(let i=0;i<100;i++){try{targets=await (await fetch('http://127.0.0.1:9222/json/list')).json();if(targets.length)break;}catch{}await sleep(100);}
+ if(!targets?.length)throw Error('Chrome did not start');
+ ws=new WebSocket(targets[0].webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});
+ let seq=0;const pending=new Map(),errors=[];
+ ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id){const p=pending.get(m.id);if(p){pending.delete(m.id);m.error?p.reject(Error(m.error.message)):p.resolve(m.result);}}else if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails.text+': '+(m.params.exceptionDetails.exception?.description||''));};
+ const send=(method,params={})=>new Promise((resolve,reject)=>{const id=++seq;pending.set(id,{resolve,reject});ws.send(JSON.stringify({id,method,params}));});
+ const evaluate=async expression=>{const r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;};
+ const wait=async(expression)=>{for(let i=0;i<150;i++){if(await evaluate(expression))return;await sleep(100);}throw Error('Timed out: '+expression);};
+ const click=async selector=>{const p=await evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});if(!e)throw Error('Missing control');e.scrollIntoView({block:'center'});const r=e.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...p});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...p});};
+ const fill=async(selector,value)=>evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+ await send('Runtime.enable');await send('Page.enable');await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
+ await send('Page.navigate',{url:'http://127.0.0.1:8765'});await wait('window.__DF_CATCH_APP_BOOT?.initialized');console.log('Packaged app initialized');
+ await evaluate(`(async()=>{const c=document.createElement('canvas');c.width=1000;c.height=500;c.getContext('2d').fillRect(0,0,1000,500);const blob=await new Promise(r=>c.toBlob(r,'image/png'));const dt=new DataTransfer();dt.items.add(new File([blob],'measurement.png',{type:'image/png'}));const e=document.querySelector('#upload-input');e.files=dt.files;e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+ await wait("!document.querySelector('#measure-photo').disabled");await click('#measure-photo');await wait("!!document.querySelector('[data-role=overlay]')");await fill('[data-role=dimension]','4');
+ await evaluate("document.querySelector('[data-role=overlay]').scrollIntoView({block:'center'})");await sleep(200);
+ for(const [x,y] of [[.1,.2],[.3,.2],[.1,.6],[.9,.6]]){const p=await evaluate(`(()=>{const r=document.querySelector('[data-role=overlay]').getBoundingClientRect();return {x:r.x+r.width*${x},y:r.y+r.height*${y}};})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...p});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...p});}
+ await wait("document.querySelector('[data-role=status]').textContent.includes('16.0 in')");await click('[data-role=apply]');await wait("document.querySelector('#length').value==='16'");console.log('Photo reference produced 16-inch estimate');
+ await fill('#species','Test bass');await click('#save-btn');await wait("document.querySelector('.catch-card')?.textContent.includes('~16 in')");
+ await send('Page.reload');await sleep(200);await wait('window.__DF_CATCH_APP_BOOT?.initialized');await click('[data-tab=gallery]');await wait("!!document.querySelector('.catch-card')");
+ await evaluate("[...document.querySelectorAll('.catch-card button')].find(e=>e.textContent==='Edit').click()");await wait("document.querySelector('#length').value==='16'");await click('#measure-photo');await wait("document.querySelector('[data-role=status]')?.textContent.includes('16.0 in')");
+ if(await evaluate("document.querySelector('[data-role=dimension]').value")!=='4')throw Error('Reference dimension not restored');
+ await fill('[data-role=zoom]','200');await click('[data-role=pan]');await writeFile('measure-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));await click('[data-role=cancel]');
+ await fill('#length','17');await click('#save-btn');await wait("document.querySelector('.catch-card')?.textContent.includes('17 in')");if(await evaluate("document.querySelector('.catch-card').textContent.includes('~17')"))throw Error('Manual edit retained estimated label');
+ if(errors.length)throw Error(errors.join('; '));console.log('Mobile upload, endpoints, save, reload, restored measurement, zoom, pan, cancel and manual override passed');
+} finally {clearTimeout(timer);ws?.close();chrome?.kill('SIGKILL');server.closeAllConnections();server.close();}
