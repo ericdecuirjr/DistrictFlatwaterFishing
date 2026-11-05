@@ -4,7 +4,7 @@ export async function measurePhoto(blob, previous) {
   const url=URL.createObjectURL(blob), image=new Image();
   try { image.src=url; await image.decode(); } catch(e) { URL.revokeObjectURL(url); throw Error('Cannot load this photo for measurement.'); }
   const dialog=document.createElement('dialog');
-  dialog.style.cssText='width: min(94vw,760px);height:90dvh;max-height:90dvh;overflow:auto;padding:16px;border-radius:16px;border:1px solid #758579;color:#173c2d;background:#fff;';
+  dialog.style.cssText='width: min(94vw,760px);height:90dvh;max-height:90dvh;overflow:auto;overflow-anchor:none;padding:16px;border-radius:16px;border:1px solid #758579;color:#173c2d;background:#fff;';
   dialog.innerHTML=`<h2>Measure fish</h2><p>Use a known-size object alongside the fish at approximately the same distance from the camera. Perspective, tilted objects and curved fish reduce accuracy.</p>
     <label>Reference object <select data-role="preset"><option value="custom">Custom / lure / boat detail</option><option value="3.375">Standard payment card — long edge, 3.375 in</option><option value="0.955">US quarter — diameter, 0.955 in</option></select></label>
     <label>Known distance <input data-role="dimension" type="number" min="0" step="any" inputmode="decimal"></label>
@@ -12,7 +12,7 @@ export async function measurePhoto(blob, previous) {
     <label>Zoom <input data-role="zoom" type="range" min="100" max="400" step="25" value="100"></label>
     <label><input data-role="pan" type="checkbox" style="width:auto;padding:0"> Pan photo while zoomed</label><p>Select an endpoint below, then tap its position on the photo. Drag a marker to adjust it. Arrow keys move the selected marker; Shift moves it farther.</p>
     <div data-role="points" style="display:flex;flex-wrap:wrap;gap:6px"></div>
-    <div data-role="viewport" style="overflow:auto;max-height:45dvh;border:1px solid #758579;margin-top:12px"><div data-role="surface" style="position:relative;width:100%;line-height:0"><img alt="Catch photo for measurement" style="display:block;width:100%;height:auto"><svg data-role="overlay" tabindex="0" role="application" aria-label="Photo endpoint editor" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none"></svg></div></div>
+    <div data-role="viewport" style="overflow:auto;overflow-anchor:none;max-height:45dvh;border:1px solid #758579;margin-top:12px"><div data-role="surface" style="position:relative;width:100%;line-height:0"><img alt="Catch photo for measurement" style="display:block;width:100%;height:auto"><svg data-role="overlay" tabindex="0" role="application" aria-label="Photo endpoint editor" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none"></svg></div></div>
     <p data-role="status" aria-live="polite" style="min-height:4em"></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button data-role="apply" type="button">Use estimated length</button><button data-role="reset" type="button">Reset points</button><button data-role="cancel" type="button">Cancel</button></div>`;
   const q=r=>dialog.querySelector('[data-role="'+r+'"]');
   dialog.querySelector('img').src=url;
@@ -34,7 +34,7 @@ export async function measurePhoto(blob, previous) {
   function place(e){const r=q('overlay').getBoundingClientRect();points[selected]={x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))};render();}
   q('overlay').onpointerdown=e=>{e.preventDefault();const index=e.target.getAttribute('data-index');if(index!==null)selected=Number(index);dragging=true;q('overlay').setPointerCapture(e.pointerId);place(e);};
   q('overlay').onpointermove=e=>{if(dragging)place(e);};
-  q('overlay').onpointerup=e=>{if(!dragging)return;place(e);dragging=false;if(selected<3&&!points[selected+1])selected++;render();};
+  q('overlay').onpointerup=e=>{if(!dragging)return;dragging=false;if(selected<3&&!points[selected+1])selected++;render();};
   q('overlay').onpointercancel=()=>{dragging=false;};
   q('overlay').onkeydown=e=>{const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];if(!delta)return;e.preventDefault();const p=points[selected]||{x:.5,y:.5},n=e.shiftKey?10:1;points[selected]={x:Math.max(0,Math.min(1,p.x+delta[0]*n/image.naturalWidth)),y:Math.max(0,Math.min(1,p.y+delta[1]*n/image.naturalHeight))};render();};
   q('preset').onchange=()=>{if(q('preset').value!=='custom'){q('dimension').value=q('preset').value;q('unit').value='in';}render();};
