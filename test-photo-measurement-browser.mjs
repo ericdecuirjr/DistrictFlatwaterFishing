@@ -11,9 +11,9 @@ try {
  await new Promise(resolve=>server.listen(8765,'127.0.0.1',resolve));
  const executable=['google-chrome','chromium','chromium-browser'].find(x=>spawnSync('which',[x]).status===0);
  if(!executable)throw Error('Chrome is required for the mobile browser check');
- chrome=spawn(executable,['--headless','--disable-extensions','--no-proxy-server','--no-sandbox','--disable-dev-shm-usage','--remote-debugging-port=9222','--user-data-dir='+await mkdtemp(join(tmpdir(),'df-test-')),'about:blank'],{stdio:['ignore','ignore','pipe']});
+ chrome=spawn(executable,['--headless','--disable-gpu','--disable-background-networking','--disable-extensions','--no-proxy-server','--no-sandbox','--disable-dev-shm-usage','--remote-debugging-port=9222','--user-data-dir='+await mkdtemp(join(tmpdir(),'df-test-')),'about:blank'],{stdio:['ignore','ignore','pipe']});
  let chromeErrors='';chrome.stderr.on('data',chunk=>{chromeErrors+=chunk.toString();});
- let targets;for(let i=0;i<100;i++){try{targets=await (await fetch('http://127.0.0.1:9222/json/list')).json();targets=targets.filter(t=>t.type==='page'&&!t.url.startsWith('chrome-extension:'));if(targets.length)break;}catch{}await sleep(100);}
+ let targets;for(let i=0;i<350;i++){try{targets=await (await fetch('http://127.0.0.1:9222/json/list')).json();targets=targets.filter(t=>t.type==='page'&&!t.url.startsWith('chrome-extension:'));if(targets.length)break;}catch{}await sleep(100);}
  if(!targets?.length)throw Error('Chrome did not start: '+chromeErrors.slice(-6000));
  ws=new WebSocket(targets[0].webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});
  let seq=0;const pending=new Map(),errors=[];
