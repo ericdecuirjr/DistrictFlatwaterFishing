@@ -63,7 +63,7 @@ jobs:
         run: |
           npm install --no-save --no-audit --no-fund playwright
           npx playwright install --with-deps chromium
-          node test-photo-measurement-browser.mjs
+          timeout 120s node test-photo-measurement-browser.mjs
       - name: Upload measurement preview
         if: always()
         uses: actions/upload-artifact@v4

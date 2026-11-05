@@ -10,7 +10,7 @@ export async function measurePhoto(blob, previous) {
     <label>Known distance <input data-role="dimension" type="number" min="0" step="any" inputmode="decimal"></label>
     <label>Units <select data-role="unit"><option value="in">Inches</option><option value="cm">Centimeters</option></select></label>
     <label>Zoom <input data-role="zoom" type="range" min="100" max="400" step="25" value="100"></label>
-    <p>Select an endpoint below, then tap its position on the photo. Drag a marker to adjust it. Arrow keys move the selected marker; Shift moves it farther.</p>
+    <label><input data-role="pan" type="checkbox"> Pan photo while zoomed</label><p>Select an endpoint below, then tap its position on the photo. Drag a marker to adjust it. Arrow keys move the selected marker; Shift moves it farther.</p>
     <div data-role="points" style="display:flex;flex-wrap:wrap;gap:6px"></div>
     <div data-role="viewport" style="overflow:auto;max-height:45dvh;border:1px solid #758579;margin-top:12px"><div data-role="surface" style="position:relative;width:100%;line-height:0"><img alt="Catch photo for measurement" style="display:block;width:100%;height:auto"><svg data-role="overlay" tabindex="0" role="application" aria-label="Photo endpoint editor" style="position:absolute;inset:0;width:100%;height:100%;touch-action:none"></svg></div></div>
     <p data-role="status" aria-live="polite"></p><div style="display:flex;gap:8px;flex-wrap:wrap"><button data-role="apply" type="button">Use estimated length</button><button data-role="reset" type="button">Reset points</button><button data-role="cancel" type="button">Cancel</button></div>`;
@@ -39,6 +39,7 @@ export async function measurePhoto(blob, previous) {
   q('overlay').onkeydown=e=>{const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];if(!delta)return;e.preventDefault();const p=points[selected]||{x:.5,y:.5},n=e.shiftKey?10:1;points[selected]={x:Math.max(0,Math.min(1,p.x+delta[0]*n/image.naturalWidth)),y:Math.max(0,Math.min(1,p.y+delta[1]*n/image.naturalHeight))};render();};
   q('preset').onchange=()=>{if(q('preset').value!=='custom'){q('dimension').value=q('preset').value;q('unit').value='in';}render();};
   q('dimension').oninput=render;q('unit').onchange=render;
+  q('pan').onchange=()=>{q('overlay').style.pointerEvents=q('pan').checked?'none':'auto';};
   q('zoom').oninput=()=>{q('surface').style.width=q('zoom').value+'%';render();};
   q('reset').onclick=()=>{points=[null,null,null,null];selected=0;render();};
   document.body.append(dialog);
