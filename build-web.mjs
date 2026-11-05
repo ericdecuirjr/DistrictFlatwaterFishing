@@ -11,7 +11,7 @@ for(const file of ['leaflet.js','leaflet.css']){
  cpSync(source,out+'/vendor/'+file);
 }
 if(existsSync('node_modules/leaflet/LICENSE'))cpSync('node_modules/leaflet/LICENSE',out+'/vendor/leaflet-LICENSE.txt');
-for(const file of ['index.html','app.js','styles.css','phase3.js','phase3.css','sw.js','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','android-diagnostics.js','photo-metadata.js','historical-weather.js','branding-logo.svg','map-utils.js','gps-coordinates.js','splash.js']){
+for(const file of ['photo-measurement.mjs','photo-measurement-ui.mjs','index.html','app.js','styles.css','phase3.js','phase3.css','sw.js','manifest.webmanifest','icon.svg','icon-192.png','icon-512.png','android-diagnostics.js','photo-metadata.js','historical-weather.js','branding-logo.svg','map-utils.js','gps-coordinates.js','splash.js']){
  if(!existsSync(file))throw Error('Missing '+file);
  cpSync(file,out+'/'+file);
 }
@@ -35,3 +35,4 @@ html=html.replace('</head>','<script>if("serviceWorker" in navigator){navigator.
 writeFileSync(out+'/index.html',html);
 await build({entryPoints:['native-bridge.mjs'],bundle:true,platform:'browser',format:'iife',target:'es2020',outfile:out+'/native-bridge.js'});
 console.log('Capacitor web files created');
+

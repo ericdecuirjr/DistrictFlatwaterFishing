@@ -1,6 +1,8 @@
 name: Build District Flatwater Fishing APK
 on:
   workflow_dispatch:
+  push:
+    branches: [feature/photo-reference-measurement]
 permissions:
   contents: read
 jobs:
@@ -38,6 +40,8 @@ jobs:
           node test-navigation.mjs
           node --check test-sticky-banner-splash.mjs
           node test-sticky-banner-splash.mjs
+          node test-photo-measurement.mjs
+          node --check photo-measurement-ui.mjs
           node --check app.js
           node --check photo-metadata.js
           node --check test-photo-metadata.mjs
@@ -55,6 +59,16 @@ jobs:
           node --check generate-android-splash.mjs
       - name: Build web content
         run: npm run build:web
+      - name: Test photo measurement on mobile browser
+        run: |
+          timeout 120s node test-photo-measurement-browser.mjs
+      - name: Upload measurement preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Photo-Measurement-Mobile-Preview
+          path: measure-mobile.png
+          if-no-files-found: ignore
       - name: Create Android project
         run: |
           npx cap add android
@@ -161,3 +175,4 @@ jobs:
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: ignore
           retention-days: 30
+

@@ -36,6 +36,7 @@
     <section id="screen-log" class="screen" aria-labelledby="log-heading">
       <div class="section-title"><div><div class="eyebrow">NEW ENTRY</div><h2 id="log-heading">Log a catch</h2></div><small id="edit-label" hidden>Editing saved catch</small></div>
       <div class="panel">
+        <button id="measure-photo" class="button secondary" type="button" disabled>Set reference / measure fish</button><p id="measurement-status" aria-live="polite"></p>
         <div id="photo-well" class="photo-well"><img id="photo-preview" alt="Selected catch photograph" hidden /><div id="photo-placeholder" class="photo-placeholder"><div class="fish-illustration">🐟</div><strong>Start with a catch photo</strong><span>Take a picture or choose one from your gallery.</span></div></div>
         <div class="photo-buttons"><button id="take-photo" class="button primary" type="button">📷 Take photo</button><button id="choose-photo" class="button secondary" type="button">＋ Choose photo</button></div>
         <input id="camera-input" type="file" accept="image/*" capture="environment" hidden />
@@ -163,3 +164,4 @@
   <script src="./phase3.js" defer></script>
 </body>
 </html>
+
