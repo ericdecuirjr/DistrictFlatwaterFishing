@@ -11,9 +11,10 @@ try {
  await new Promise(resolve=>server.listen(8765,'127.0.0.1',resolve));
  const executable=['google-chrome','chromium','chromium-browser'].find(x=>spawnSync('which',[x]).status===0);
  if(!executable)throw Error('Chrome is required for the mobile browser check');
- chrome=spawn(executable,['--headless','--no-sandbox','--disable-dev-shm-usage','--remote-debugging-port=9222','--user-data-dir='+await mkdtemp(join(tmpdir(),'df-test-')),'about:blank'],{stdio:'ignore'});
+ chrome=spawn(executable,['--headless','--no-sandbox','--disable-dev-shm-usage','--remote-debugging-port=9222','--user-data-dir='+await mkdtemp(join(tmpdir(),'df-test-')),'about:blank'],{stdio:['ignore','ignore','pipe']});
+ let chromeErrors='';chrome.stderr.on('data',chunk=>{chromeErrors+=chunk.toString();});
  let targets;for(let i=0;i<100;i++){try{targets=await (await fetch('http://127.0.0.1:9222/json/list')).json();if(targets.length)break;}catch{}await sleep(100);}
- if(!targets?.length)throw Error('Chrome did not start');
+ if(!targets?.length)throw Error('Chrome did not start: '+chromeErrors.slice(-6000));
  ws=new WebSocket(targets[0].webSocketDebuggerUrl);await new Promise((r,j)=>{ws.onopen=r;ws.onerror=j;});
  let seq=0;const pending=new Map(),errors=[];
  ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.id){const p=pending.get(m.id);if(p){pending.delete(m.id);m.error?p.reject(Error(m.error.message)):p.resolve(m.result);}}else if(m.method==='Runtime.exceptionThrown')errors.push(m.params.exceptionDetails.text+': '+(m.params.exceptionDetails.exception?.description||''));};
