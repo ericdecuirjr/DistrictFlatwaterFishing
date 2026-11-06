@@ -116,15 +116,68 @@
       const bytes=new Uint8Array(await file.slice(0,Math.min(file.size,8*1024*1024)).arrayBuffer());
       exif=parseExifBytes(bytes);
     }catch(e){return {date:null,latitude:null,longitude:null,reason:'Could not read image metadata'};}
-    // Capacitor Camera can return EXIF separately when a picker has changed the image bytes.
-    const native=file.nativeExif&&typeof file.nativeExif==='object'?file.nativeExif:null;
-    const rawDate=exif?.capturedAt||native?.DateTimeOriginal||native?.dateTimeOriginal||native?.DateTimeDigitized||'';
-    const rawOffset=exif?.offsetTime||native?.OffsetTimeOriginal||native?.offsetTimeOriginal||'';
+    // Native camera metadata is sometimes a JSON string in Capacitor 8.1+.
+    // Samsung/Android may provide GPS as fractions (degrees/minutes/seconds),
+    // not the pre-decimalized latitude/longitude used by our old fallback.
+    let native=null;
+    if(file.nativeExif&&typeof file.nativeExif==='object')native=file.nativeExif;
+    else if(typeof file.nativeExif==='string'&&file.nativeExif.length<200000){
+      try{const parsed=JSON.parse(file.nativeExif);if(parsed&&typeof parsed==='object')native=parsed;}
+      catch(_e){/* An unavailable native EXIF blob is not a GPS location. */}
+    }
+    const gps=native?.GPS||native?.['{GPS}']||native?.gps||native;
+    const rational=value=>{
+      if(typeof value==='number')return Number.isFinite(value)?value:null;
+      if(typeof value!=='string')return null;
+      const s=value.trim();
+      if(/^[-+]?\\d+(?:\\.\\d+)?$/.test(s))return Number(s);
+      const parts=/^([+-]?\\d+(?:\\.\\d+)?)\\s*\\/\\s*(\\d+(?:\\.\\d+)?)$/.exec(s);
+      if(!parts||Number(parts[2])===0)return null;
+      return Number(parts[1])/Number(parts[2]);
+    };
+    const dms=value=>{
+      if(Array.isArray(value)&&value.length===3){
+        const parts=value.map(rational);
+        return parts.every(Number.isFinite)&&parts[0]>=0&&parts[1]>=0&&parts[1]<60&&parts[2]>=0&&parts[2]<60?
+          parts[0]+parts[1]/60+parts[2]/3600:null;
+      }
+      if(typeof value==='string'){
+        const parts=value.trim().split(/[,;\\s°′'″"]+/).filter(Boolean);
+        if(parts.length===3)return dms(parts);
+      }
+      return null;
+    };
+    const nativeCoordinate=(name,limit)=>{
+      const direct=validCoordinate(native?.[name],limit);
+      if(direct!==null)return direct;
+      const value=gps?.[name==='latitude'?'GPSLatitude':'GPSLongitude']??
+        gps?.[name==='latitude'?'Latitude':'Longitude'];
+      const ref=String(gps?.[name==='latitude'?'GPSLatitudeRef':'GPSLongitudeRef']??
+        gps?.[name==='latitude'?'LatitudeRef':'LongitudeRef']??'').trim().toUpperCase();
+      if(!['N','S','E','W'].includes(ref))return null;
+      if(name==='latitude'&&!['N','S'].includes(ref))return null;
+      if(name==='longitude'&&!['E','W'].includes(ref))return null;
+      const degrees=dms(value)??rational(value);
+      if(!Number.isFinite(degrees)||degrees<0||degrees>limit)return null;
+      return (ref==='S'||ref==='W'?-1:1)*degrees;
+    };
+    const rawDate=exif?.capturedAt||native?.DateTimeOriginal||native?.dateTimeOriginal||
+      native?.DateTimeDigitized||native?.['Date/Time Original']||'';
+    const rawOffset=exif?.offsetTime||native?.OffsetTimeOriginal||
+      native?.offsetTimeOriginal||'';
     const date=normalizedTime(rawDate,rawOffset);
-    const latitude=validCoordinate(exif?.latitude,90)??validCoordinate(native?.latitude,90);
-    const longitude=validCoordinate(exif?.longitude,180)??validCoordinate(native?.longitude,180);
-    const reason=!date&&!(latitude!==null&&longitude!==null)?'No original capture date or GPS coordinates found in this file. Some photo apps remove EXIF.':'';
+    // Coordinates must come from a matching pair in the same source.
+    const exifPair=validCoordinate(exif?.latitude,90)!==null&&validCoordinate(exif?.longitude,180)!==null;
+    const nativeLatitude=nativeCoordinate('latitude',90);
+    const nativeLongitude=nativeCoordinate('longitude',180);
+    const nativePair=nativeLatitude!==null&&nativeLongitude!==null;
+    const latitude=exifPair?exif.latitude:(nativePair?nativeLatitude:null);
+    const longitude=exifPair?exif.longitude:(nativePair?nativeLongitude:null);
+    const reason=!nativePair&&!exifPair?
+      'Photo GPS unavailable: the image may have no location tags, or Android may have withheld them. Try browsing the original file.':
+      '';
     return {date,latitude,longitude,reason};
+
   }
   window.DistrictFlatwaterPhotoMetadata={read,parseExifBytes,normalizedTime};
 })();
