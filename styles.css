@@ -172,7 +172,7 @@ main{max-width:990px}
 .card-actions button{min-height:44px;font-size:.85rem}
 .detail-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .detail-actions button{flex:1}
-.form-actions{position:sticky;bottom:calc(var(--df-nav-height) + var(--df-nav-safe) + 8px);z-index:100;background:#f3f5eff5;border:1px solid #dbe4dc;border-radius:14px;padding:8px;box-shadow:0 4px 16px #173d2d12}
+.form-actions{position:static;background:#f3f5eff5;border:1px solid #dbe4dc;border-radius:14px;padding:8px;box-shadow:0 4px 16px #173d2d12}
 .helper{color:#526e5e!important}
 button:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid #b48a29;outline-offset:3px}
 #df-map-favorite{width:24px;height:24px;accent-color:#1c503b}

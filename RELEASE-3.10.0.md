@@ -4,7 +4,7 @@ Presentation and navigation upgrade built on the v3.9.0 safeguards. This branch 
 
 - Five main destinations: Home, Log, Gallery, Map and More. Analytics is under More, alongside Settings & backup and separate Diagnostics.
 - Compact shared brand header; Home holds the full emblem, catch counters, recent catch cards, logging and backup shortcuts.
-- Photo and species remain visible in Log. Optional location/weather and additional catch details expand on demand. Editing opens both sections; applying a measurement opens the length field. Save remains accessible above the bottom navigation.
+- Photo and species remain visible in Log. Optional location/weather and additional catch details expand on demand. Editing opens both sections; applying a measurement opens the length field. Save sits at the end of the form with space above the fixed bottom navigation.
 - Gallery searches species, spot, lure and notes alongside existing species/sort controls. Cards emphasize photos and catch information; View opens a detail dialog containing Edit and Delete actions.
 - Map filters collapse independently from the saved-location list. Existing pin summaries and saved-GPS behavior remain.
 - Measurement adds a short three-step guide, a larger photo viewport and sticky Fit/zoom controls.

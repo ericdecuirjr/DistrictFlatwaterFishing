@@ -60,7 +60,7 @@ try {
   if(width<height)await writeFile('measure-fit-portrait.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
   console.log('Whole photo fit and button zoom passed:',width,height);await click('[data-role=cancel]');
  }
- await click('#tab-home');await wait("document.querySelector('#home-recent').textContent.includes('North cove')");
+ await click('#tab-home');await wait("document.querySelector('#home-recent').textContent.includes('North cove')");if(await evaluate("document.querySelector('#save-btn').getClientRects().length"))throw Error('Log actions leaked onto Home');
  await sleep(300);await writeFile('presentation-home-saved-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await click('#tab-more');await click('[data-tab=analytics]');await wait("!document.querySelector('#screen-analytics').hidden");
  if(await evaluate("document.querySelector('#tab-more').getAttribute('aria-current')")!=='page')throw Error('Analytics should keep More active');
