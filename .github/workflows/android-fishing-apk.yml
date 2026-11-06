@@ -100,7 +100,7 @@ jobs:
           build = gradle.read_text()
           assert 'dependencies {' in build, 'App dependencies block missing'
           build = build.replace('dependencies {',
-            "dependencies {\\n    implementation 'androidx.exifinterface:exifinterface:1.4.1'", 1)
+            "dependencies {" + chr(10) + "    implementation 'androidx.exifinterface:exifinterface:1.4.1'", 1)
           gradle.write_text(build)
           assert "androidx.exifinterface:exifinterface:1.4.1" in gradle.read_text()
           PY
