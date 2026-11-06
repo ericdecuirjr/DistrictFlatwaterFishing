@@ -2,7 +2,7 @@ name: Build District Flatwater Fishing APK
 on:
   workflow_dispatch:
   push:
-    branches: [feature/photo-reference-measurement, fix/photo-zoom-fit, fix/s23-original-photo-gps]
+    branches: [main, feature/photo-reference-measurement, fix/photo-zoom-fit, fix/s23-original-photo-gps, fix/s23-gps-build-3-8-2]
 permissions:
   contents: read
 jobs:
@@ -96,6 +96,13 @@ jobs:
             '  }')
           main.write_text(source)
           assert 'registerPlugin(DistrictPhotoImportPlugin.class)' in main.read_text()
+          gradle = Path('android/app/build.gradle')
+          build = gradle.read_text()
+          assert 'dependencies {' in build, 'App dependencies block missing'
+          build = build.replace('dependencies {',
+            "dependencies {" + chr(10) + "    implementation 'androidx.exifinterface:exifinterface:1.4.1'", 1)
+          gradle.write_text(build)
+          assert "androidx.exifinterface:exifinterface:1.4.1" in gradle.read_text()
           PY
       - name: Install District Flatwater launcher artwork
         run: node generate-android-icons.mjs

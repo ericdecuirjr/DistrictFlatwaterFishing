@@ -130,8 +130,8 @@
       if(typeof value==='number')return Number.isFinite(value)?value:null;
       if(typeof value!=='string')return null;
       const s=value.trim();
-      if(/^[-+]?\\d+(?:\\.\\d+)?$/.test(s))return Number(s);
-      const parts=/^([+-]?\\d+(?:\\.\\d+)?)\\s*\\/\\s*(\\d+(?:\\.\\d+)?)$/.exec(s);
+      if(/^[-+]?\d+(?:\.\d+)?$/.test(s))return Number(s);
+      const parts=/^([+-]?\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/.exec(s);
       if(!parts||Number(parts[2])===0)return null;
       return Number(parts[1])/Number(parts[2]);
     };
@@ -142,7 +142,7 @@
           parts[0]+parts[1]/60+parts[2]/3600:null;
       }
       if(typeof value==='string'){
-        const parts=value.trim().split(/[,;\\s°′'″"]+/).filter(Boolean);
+        const parts=value.trim().split(/[,;\s°′'″"]+/).filter(Boolean);
         if(parts.length===3)return dms(parts);
       }
       return null;
