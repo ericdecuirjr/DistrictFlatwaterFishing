@@ -2,7 +2,7 @@ name: Build District Flatwater Fishing APK
 on:
   workflow_dispatch:
   push:
-    branches: [feature/photo-reference-measurement, fix/photo-zoom-fit, fix/s23-original-photo-gps]
+    branches: [main, feature/photo-reference-measurement, fix/photo-zoom-fit, fix/s23-original-photo-gps, fix/s23-gps-build-3-8-2]
 permissions:
   contents: read
 jobs:
