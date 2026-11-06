@@ -34,6 +34,11 @@ try {
  await send('Page.reload');await sleep(200);await wait('window.__DF_CATCH_APP_BOOT?.initialized');await wait("!document.querySelector('#df-launch-splash')");await click('[data-tab=gallery]');await wait("!!document.querySelector('.catch-card')");
  await evaluate("[...document.querySelectorAll('.catch-card button')].find(e=>e.textContent==='Edit').click()");await wait("document.querySelector('#length').value==='16'");await click('#measure-photo');await wait("document.querySelector('[data-role=status]')?.textContent.includes('16.0 in')");
  if(await evaluate("document.querySelector('[data-role=dimension]').value")!=='4')throw Error('Reference dimension not restored');
+ await evaluate("(()=>{const u=document.querySelector('[data-role=unit]');u.value='cm';u.dispatchEvent(new Event('change'));})()");
+ await wait("document.querySelector('[data-role=dimension]').value==='10.16'");
+ await wait("document.querySelector('[data-role=status]').textContent.includes('40.6 cm')");
+ await evaluate("(()=>{const u=document.querySelector('[data-role=unit]');u.value='in';u.dispatchEvent(new Event('change'));})()");
+ await wait("document.querySelector('[data-role=status]').textContent.includes('16.0 in')");
  await fill('[data-role=zoom]','200');await click('[data-role=pan]');await writeFile('measure-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));await click('[data-role=cancel]');
  await fill('#length','17');await click('#save-btn');await wait("document.querySelector('.catch-card')?.textContent.includes('17 in')");if(await evaluate("document.querySelector('.catch-card').textContent.includes('~17')"))throw Error('Manual edit retained estimated label');
  for(const [width,height] of [[500,1600],[1600,500]]){
