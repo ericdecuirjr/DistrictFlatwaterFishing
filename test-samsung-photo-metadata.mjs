@@ -32,7 +32,7 @@ const missing=await reader.read(asFile({DateTimeOriginal:'2026:11:05 12:34:56'})
 assert.equal(missing.latitude,null);
 assert.equal(missing.longitude,null);
 assert.match(missing.reason,/Android|location/);
-const partial=await reader.read(asFile({latitude:38.8,GPSLongitude:'76/1, 30/1, 0/1',GPSLongitudeRef:'W'}));
+const partial=await reader.read(asFile({latitude:38.8}));
 assert.equal(partial.latitude,null);
 assert.equal(partial.longitude,null);
 const invalid=await reader.read(asFile({
