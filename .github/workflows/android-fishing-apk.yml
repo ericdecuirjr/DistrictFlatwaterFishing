@@ -46,6 +46,7 @@ jobs:
           node --check photo-metadata.js
           node --check test-photo-metadata.mjs
           node test-photo-metadata.mjs
+          node test-samsung-photo-metadata.mjs
           node --check android-diagnostics.js
           node --check map-utils.js
           node --check test-map.mjs
@@ -75,6 +76,27 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+      - name: Register original-photo EXIF Android bridge
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          package = Path('android/app/src/main/java/com/districtflatwater/fishing')
+          package.mkdir(parents=True, exist_ok=True)
+          (package/'DistrictPhotoImportPlugin.java').write_text(Path('native/DistrictPhotoImportPlugin.java').read_text())
+          main = package/'MainActivity.java'
+          source = main.read_text()
+          assert 'extends BridgeActivity' in source
+          source = source.replace('import com.getcapacitor.BridgeActivity;', 'import com.getcapacitor.BridgeActivity;\\nimport android.os.Bundle;')
+          source = source.replace('public class MainActivity extends BridgeActivity {',
+            'public class MainActivity extends BridgeActivity {\\n'
+            '  @Override public void onCreate(Bundle savedInstanceState) {\\n'
+            '    registerPlugin(DistrictPhotoImportPlugin.class);\\n'
+            '    super.onCreate(savedInstanceState);\\n'
+            '  }')
+          main.write_text(source)
+          assert 'registerPlugin(DistrictPhotoImportPlugin.class)' in main.read_text()
+          PY
       - name: Install District Flatwater launcher artwork
         run: node generate-android-icons.mjs
       - name: Install District Flatwater native launch screen
