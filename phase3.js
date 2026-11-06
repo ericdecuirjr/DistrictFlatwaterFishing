@@ -187,13 +187,14 @@ function init(){
  const live=el('p','df-map-live-status');live.id='df-map-live-status';live.setAttribute('role','status');
  live.textContent='Map synchronized with saved catch records.';mp.append(live);
  locations.append(mp);
- const search=panel('Saved fishing locations'),label=el('label','','Filter by species'),input=el('input');
+ const search=el('details','panel map-filters');search.id='df-map-filters';const filterTitle=el('summary','','Filter saved locations');search.append(filterTitle);const label=el('label','','Filter by species'),input=el('input');
  label.htmlFor='df-map-search';input.id='df-map-search';input.placeholder='e.g. Largemouth bass';
- const list=el('div','df-map-list');list.id='df-map-list';search.append(label,input,list);locations.append(search);
+ const list=el('div','df-map-list');list.id='df-map-list';search.append(label,input);locations.append(search,list);
+ const back=button('','← More','button secondary compact');analytics.children[0].append(back);back.addEventListener('click',()=>document.querySelector('#tab-more').click());
  main.insertBefore(analytics,$('screen-settings'));main.insertBefore(locations,$('screen-settings'));
  $('df-load-map').addEventListener('click',loadMap);
  input.addEventListener('input',renderLocations);
- for(const [id,title,type] of [['df-map-lure','Filter by bait / lure','text'],['df-map-spot','Filter by spot name','text'],['df-map-favorite','Favorite spots only','checkbox']]){const label=el('label','',title),control=el('input');control.id=id;control.type=type;label.htmlFor=id;search.insertBefore(label,list);search.insertBefore(control,list);control.addEventListener('input',renderLocations);}
+ for(const [id,title,type] of [['df-map-lure','Filter by bait / lure','text'],['df-map-spot','Filter by spot name','text'],['df-map-favorite','Favorite spots only','checkbox']]){const label=el('label','',title),control=el('input');control.id=id;control.type=type;label.htmlFor=id;search.append(label,control);control.addEventListener('input',renderLocations);}
  const reload=button('df-refresh-map','Refresh saved locations','button secondary compact');reload.addEventListener('click',refresh);search.append(reload);
  document.addEventListener('df-tab-change',event=>{
    if(event.detail?.name==='analytics')renderAnalytics();

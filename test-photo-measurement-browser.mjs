@@ -25,14 +25,21 @@ try {
  const fill=async(selector,value)=>evaluate(`(()=>{const e=document.querySelector(${JSON.stringify(selector)});e.value=${JSON.stringify(value)};e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
  await send('Runtime.enable');await send('Page.enable');await send('Emulation.setDeviceMetricsOverride',{width:390,height:844,deviceScaleFactor:1,mobile:true});
  console.log('Navigation:',await send('Page.navigate',{url:'http://127.0.0.1:8765'}));await wait('window.__DF_CATCH_APP_BOOT?.initialized');await wait("!document.querySelector('#df-launch-splash')");console.log('Packaged app initialized');
+ await wait("!document.querySelector('#screen-home').hidden");
+ if(await evaluate("document.querySelector('.df-sticky-brand-shell').getBoundingClientRect().height")>100)throw Error('Shared header too tall');
+ await sleep(300);await writeFile('presentation-home-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+ await click('#tab-log');
+ await wait("!document.querySelector('#screen-log').hidden");
+ if(await evaluate("document.querySelector('#location-section').open||document.querySelector('#details-section').open"))throw Error('Optional form details should start collapsed');
+ await sleep(300);await wait("window.scrollY===0&&document.querySelector('.df-sticky-brand-shell').getBoundingClientRect().top===0");await writeFile('presentation-log-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await evaluate(`(async()=>{const c=document.createElement('canvas');c.width=1000;c.height=500;c.getContext('2d').fillRect(0,0,1000,500);const blob=await new Promise(r=>c.toBlob(r,'image/png'));const dt=new DataTransfer();dt.items.add(new File([blob],'measurement.png',{type:'image/png'}));const e=document.querySelector('#upload-input');e.files=dt.files;e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
  await wait("!document.querySelector('#measure-photo').disabled");await click('#measure-photo');await wait("!!document.querySelector('[data-role=overlay]')");await fill('[data-role=dimension]','4');
  await evaluate("document.querySelector('[data-role=overlay]').scrollIntoView({block:'center'})");await sleep(200);
  for(const [x,y] of [[.1,.2],[.3,.2],[.1,.6],[.9,.6]]){const p=await evaluate(`(()=>{const r=document.querySelector('[data-role=overlay]').getBoundingClientRect();return {x:r.x+r.width*${x},y:r.y+r.height*${y}};})()`);await send('Input.dispatchMouseEvent',{type:'mousePressed',button:'left',clickCount:1,...p});await send('Input.dispatchMouseEvent',{type:'mouseReleased',button:'left',clickCount:1,...p});console.log('Endpoint',x,y,p,await evaluate("({rect:(()=>{const r=document.querySelector('[data-role=overlay]').getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})(),circles:[...document.querySelectorAll('[data-role=overlay] circle')].map(c=>[c.getAttribute('cx'),c.getAttribute('cy')]),status:document.querySelector('[data-role=status]').textContent})"));}
  await wait("document.querySelector('[data-role=status]').textContent.includes('16.0 in')");await click('[data-role=apply]');await wait("document.querySelector('#length').value==='16'");console.log('Photo reference produced 16-inch estimate');
- await fill('#species','Test bass');await click('#save-btn');await wait("document.querySelector('.catch-card')?.textContent.includes('~16 in')");
+ await fill('#species','Test bass');await fill('#spot-name','North cove');await evaluate("document.querySelector('#favorite-spot').checked=true");await click('#save-btn');await wait("document.querySelector('.catch-card')?.textContent.includes('~16 in')");
  await send('Page.reload');await sleep(200);await wait('window.__DF_CATCH_APP_BOOT?.initialized');await wait("!document.querySelector('#df-launch-splash')");await click('[data-tab=gallery]');await wait("!!document.querySelector('.catch-card')");
- await evaluate("[...document.querySelectorAll('.catch-card button')].find(e=>e.textContent==='Edit').click()");await wait("document.querySelector('#length').value==='16'");await click('#measure-photo');await wait("document.querySelector('[data-role=status]')?.textContent.includes('16.0 in')");
+ await click('.catch-card button');await evaluate("[...document.querySelectorAll('.detail-actions button')].find(e=>e.textContent==='Edit catch').click()");await wait("document.querySelector('#length').value==='16'");await click('#measure-photo');await wait("document.querySelector('[data-role=status]')?.textContent.includes('16.0 in')");
  if(await evaluate("document.querySelector('[data-role=dimension]').value")!=='4')throw Error('Reference dimension not restored');
  await evaluate("(()=>{const u=document.querySelector('[data-role=unit]');u.value='cm';u.dispatchEvent(new Event('change'));})()");
  await wait("document.querySelector('[data-role=dimension]').value==='10.16'");
@@ -53,5 +60,12 @@ try {
   if(width<height)await writeFile('measure-fit-portrait.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
   console.log('Whole photo fit and button zoom passed:',width,height);await click('[data-role=cancel]');
  }
+ await click('#tab-home');await wait("document.querySelector('#home-recent').textContent.includes('North cove')");if(await evaluate("document.querySelector('#save-btn').getClientRects().length"))throw Error('Log actions leaked onto Home');
+ await sleep(300);await writeFile('presentation-home-saved-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+ await click('#tab-more');await click('[data-tab=analytics]');await wait("!document.querySelector('#screen-analytics').hidden");
+ if(await evaluate("document.querySelector('#tab-more').getAttribute('aria-current')")!=='page')throw Error('Analytics should keep More active');
+ await click('#tab-gallery');await fill('#catch-search','not-a-match');await wait("document.querySelector('#gallery-grid').children.length===0");
+ await fill('#catch-search','North cove');await wait("document.querySelector('#gallery-grid').children.length===1");
+ await sleep(300);await writeFile('presentation-gallery-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  if(errors.length)throw Error(errors.join('; '));console.log('Mobile upload, endpoints, save, reload, restored measurement, zoom, pan, cancel and manual override passed');
 } finally {clearTimeout(timer);ws?.close();chrome?.kill('SIGKILL');server.closeAllConnections();server.close();}

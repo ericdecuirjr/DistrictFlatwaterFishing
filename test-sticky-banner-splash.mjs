@@ -9,7 +9,7 @@ assert.ok(html.includes('<div class="df-sticky-brand-shell">'),'Missing sticky b
 assert.ok(html.includes('<section class="intro" aria-label="District Flatwater Fishing banner">'));
 const shell=html.split('<div class="df-sticky-brand-shell">')[1].split('</div>\n  <main>')[0];
 assert.ok(shell.includes('class="masthead"'));
-assert.ok(shell.includes('id="total-catches"'),'Catch counters must remain displayed');
+assert.ok(html.includes('id="total-catches"'),'Home catch counters must remain displayed');
 assert.ok(shell.includes('branding-logo.svg'),'Approved branded emblem must remain');
 assert.ok(html.indexOf('df-sticky-brand-shell') < html.indexOf('<main>'),'Banner should sit outside tab-switching screens');
 assert.ok(!app.includes("intro.hidden=requested!=='log'"),'Navigation must not hide banner');
