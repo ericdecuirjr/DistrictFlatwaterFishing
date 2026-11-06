@@ -22,6 +22,11 @@
     <div class="brand"><img src="./branding-logo.svg" alt="" width="44" height="44" /><div><b>DISTRICT FLATWATER</b><span>THE CATCH LOG</span></div></div>
     <span class="connection"><span id="network-dot" class="dot"></span><span id="network-label">Checking...</span></span>
   </header>
+
+  </div>
+  <main>
+    <section id="screen-home" class="screen" aria-labelledby="home-heading">
+      <div class="section-title"><div><div class="eyebrow">YOUR FISHING LOGBOOK</div><h2 id="home-heading">Back on the water.</h2></div></div>
     <section class="intro" aria-label="District Flatwater Fishing banner">
       <div class="intro-copy">
         <div class="eyebrow">District Flatwater Fishing · Catch Log</div>
@@ -31,14 +36,21 @@
       </div>
       <img class="intro-emblem" src="./branding-logo.svg" alt="District Flatwater Fishing bass and fleur-de-lis emblem" width="240" height="240" />
     </section>
-  </div>
-  <main>
-    <section id="screen-log" class="screen" aria-labelledby="log-heading">
-      <div class="section-title"><div><div class="eyebrow">NEW ENTRY</div><h2 id="log-heading">Log a catch</h2></div><small id="edit-label" hidden>Editing saved catch</small></div>
-      <div class="panel">
-        <button id="measure-photo" class="button secondary" type="button" disabled>Set reference / measure fish</button><p id="measurement-status" aria-live="polite"></p>
+      <div class="home-shortcuts"><button id="home-log" class="button primary" type="button">＋ Log a catch</button><button class="button secondary" data-tab="map" type="button">Explore saved spots</button></div>
+      <div class="section-title"><h2>Recent catches</h2><button class="button ghost compact" data-tab="gallery" type="button">View all →</button></div>
+      <div id="home-recent" class="home-recent"></div>
+      <div class="panel home-backup"><h3>Keep your logbook safe</h3><p>Photos and catches live on this device. Keep a backup before changing phones.</p><button class="button secondary" type="button" data-tab="settings">Backup & storage</button></div>
+    </section>
+
+    <section id="screen-log" class="screen" aria-labelledby="log-heading" hidden>
+      <div class="section-title"><div><div class="eyebrow">YOUR NEXT STORY</div><h2 id="log-heading">Log a catch</h2></div><small id="edit-label" hidden>Editing saved catch</small></div>
+      <p class="form-guide">Start with a photo and species. Add a location or more details when you need them.</p>
+      <div class="panel photo-panel">
+        <h3>1 · Catch photo</h3>
+
         <div id="photo-well" class="photo-well"><img id="photo-preview" alt="Selected catch photograph" hidden /><div id="photo-placeholder" class="photo-placeholder"><div class="fish-illustration">🐟</div><strong>Start with a catch photo</strong><span>Take a picture or choose one from your gallery.</span></div></div>
         <div class="photo-buttons"><button id="take-photo" class="button primary" type="button">📷 Take photo</button><button id="choose-photo" class="button secondary" type="button">＋ Choose photo</button></div>
+        <button id="measure-photo" class="button secondary" type="button" disabled>Set reference / measure fish</button><p id="measurement-status" aria-live="polite"></p>
         <input id="camera-input" type="file" accept="image/*" capture="environment" hidden />
         <input id="upload-input" type="file" accept="image/*" hidden />
         <div id="metadata-panel" class="photo-metadata-panel" hidden>
@@ -55,7 +67,7 @@
         <p class="helper">Photos stay on this device. They are sent to Gemini only if you tap “Identify with Gemini.”</p>
       </div>
       <div class="panel">
-        <div class="panel-heading"><h3>Fish identification</h3><span class="pill">AI + manual</span></div>
+        <div class="panel-heading"><h3>2 · Fish details</h3><span class="pill">AI + manual</span></div>
         <button id="identify-btn" type="button" class="button ai" disabled>✦ Identify with Gemini</button>
         <div id="ai-result" class="ai-result" hidden></div>
         <label for="species">Species <span class="required">*</span></label>
@@ -63,8 +75,8 @@
         <datalist id="species-options"><option value="Largemouth bass"/><option value="Smallmouth bass"/><option value="Striped bass"/><option value="Bluegill"/><option value="Black crappie"/><option value="White crappie"/><option value="Channel catfish"/><option value="Rainbow trout"/><option value="Northern pike"/><option value="Walleye"/><option value="Red drum"/><option value="Spotted seatrout"/><option value="Flounder"/></datalist>
         <p class="helper">Gemini's result is only a suggestion; review it before saving.</p>
       </div>
-      <div class="panel">
-        <div class="panel-heading"><h3>Time, location & conditions</h3><span class="pill">Auto-capture</span></div>
+      <details class="panel form-section" id="location-section">
+        <summary><span>3 · Location & conditions</span><small>Optional · GPS, date & weather</small></summary>
         <label for="caught-at">Time logged</label>
         <input id="caught-at" type="datetime-local" />
         <p class="helper">Defaults to when the photo is selected unless you choose its original EXIF date. You can edit this field.</p>
@@ -100,13 +112,13 @@
           </div>
           <p class="helper">Open-Meteo historical data are modeled estimates, not direct measurements. Time is matched to the closest UTC hour. Recent dates, older years, and some locations may lack data. Only the selected coordinates and date range are sent to Open-Meteo.</p>
         </div>
-      </div>
-      <div class="panel"><h3>Catch details <span class="optional">(optional)</span></h3><div class="two-col"><div><label for="length">Length (inches)</label><input id="length" type="number" min="0" max="200" step="0.1" inputmode="decimal" placeholder="—" /></div><div><label for="weight">Weight (pounds)</label><input id="weight" type="number" min="0" max="2000" step="0.01" inputmode="decimal" placeholder="—" /></div></div><label for="lure">Bait / lure</label><input id="lure" type="text" maxlength="120" placeholder="What worked?" /><label for="spot-name">Fishing spot name</label><input id="spot-name" maxlength="100" placeholder="e.g. North cove"/><label><input id="favorite-spot" type="checkbox" style="width:auto"/> Favorite fishing spot</label><label for="notes">Notes</label><textarea id="notes" rows="3" maxlength="1500" placeholder="Water conditions, technique, or a good story..."></textarea></div>
+      </details>
+      <details class="panel form-section" id="details-section"><summary><span>More catch details</span><small>Optional · size, lure & spot</small></summary><div class="two-col"><div><label for="length">Length (inches)</label><input id="length" type="number" min="0" max="200" step="0.1" inputmode="decimal" placeholder="—" /></div><div><label for="weight">Weight (pounds)</label><input id="weight" type="number" min="0" max="2000" step="0.01" inputmode="decimal" placeholder="—" /></div></div><label for="lure">Bait / lure</label><input id="lure" type="text" maxlength="120" placeholder="What worked?" /><label for="spot-name">Fishing spot name</label><input id="spot-name" maxlength="100" placeholder="e.g. North cove"/><label><input id="favorite-spot" type="checkbox" style="width:auto"/> Favorite fishing spot</label><label for="notes">Notes</label><textarea id="notes" rows="3" maxlength="1500" placeholder="Water conditions, technique, or a good story..."></textarea></details>
       <div class="form-actions"><button id="save-btn" class="button primary save" type="button">Save catch</button><button id="cancel-edit" class="button ghost" type="button" hidden>Cancel editing</button></div>
     </section>
     <section id="screen-gallery" class="screen" aria-labelledby="gallery-heading" hidden>
       <div class="section-title"><div><div class="eyebrow">YOUR COLLECTION</div><h2 id="gallery-heading">Catch gallery</h2></div><button id="new-from-gallery" class="button secondary compact" type="button">＋ Add catch</button></div>
-      <div class="panel filter-bar"><div><label for="species-filter">Species</label><select id="species-filter"><option value="">All species</option></select></div><div><label for="sort-by">Sort by</label><select id="sort-by"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="az">Species A–Z</option><option value="za">Species Z–A</option></select></div></div>
+      <div class="panel filter-bar"><div class="gallery-search"><label for="catch-search">Search catches</label><input id="catch-search" type="search" placeholder="Species, spot, lure or notes"/></div><div><label for="species-filter">Species</label><select id="species-filter"><option value="">All species</option></select></div><div><label for="sort-by">Sort by</label><select id="sort-by"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="az">Species A–Z</option><option value="za">Species Z–A</option></select></div></div>
       <div id="gallery-grid" class="gallery-grid"></div><div id="gallery-empty" class="empty"><span>🎣</span><h3>No catches to show</h3><p>Photograph your first catch to begin your logbook.</p></div>
     </section>
     <section id="screen-settings" class="screen" aria-labelledby="settings-heading" hidden>
@@ -114,7 +126,7 @@
       <div class="panel"><h3>Gemini fish identification</h3><p>AI identification requires a secure companion service. Set its HTTPS URL below after deployment. Do not enter an API key here.</p><label for="proxy-url">Gemini service URL</label><input id="proxy-url" type="url" placeholder="https://your-worker.workers.dev" inputmode="url" /><button id="save-proxy" class="button secondary" type="button">Save service URL</button><p class="helper">The Gemini API key belongs in a server-side secret, never in app files or GitHub Pages.</p></div>
       <div class="panel"><h3>Your catch data</h3><p>Your pictures and catch details are saved locally on this browser/app installation. Export backups regularly, especially before changing phones or installing a separate Android APK.</p><p id="backup-status" role="status"></p><button id="protect-storage" type="button" class="button secondary">Request persistent storage</button><div class="stack"><button id="export-btn" class="button secondary" type="button">↓ Export catch backup (JSON)</button><button id="import-btn" class="button ghost" type="button">↑ Import catch backup (JSON)</button></div><input id="import-file" type="file" accept="application/json,.json" hidden/><p class="helper">Import checks the full file, previews the catch count, and adds new catches in one transaction. Existing matching IDs are kept. Backups include private GPS locations and photos; store them securely.</p></div>
       <div class="panel"><h3>How weather is recorded</h3><p>Temperature, local surface pressure and conditions come from <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> forecasts/models. These values are estimates for the logged location and time, not direct ambient sensor readings. If you're offline, the catch saves without them.</p></div>
-      <div class="panel"><h3>About District Flatwater</h3><p>Phase 1 — private, offline-first catch log. Version <span id="version">1.0.0</span>.</p></div>
+      <div class="panel"><h3>About District Flatwater</h3><p>Private, offline-first catch log. Version <span id="version">1.0.0</span>.</p></div>
     </section>
     <section id="screen-diagnostics" class="screen" aria-labelledby="diagnostics-heading" hidden>
       <div class="section-title"><div><div class="eyebrow">TROUBLESHOOTING</div><h2 id="diagnostics-heading">Diagnostics</h2></div><button class="button secondary compact" type="button" data-tab="more">← More</button></div>
@@ -124,6 +136,7 @@
     <section id="screen-more" class="screen" aria-labelledby="more-heading" hidden>
       <div class="section-title"><div><div class="eyebrow">TOOLS & PREFERENCES</div><h2 id="more-heading">More</h2></div></div>
       <div class="more-navigation">
+        <button type="button" class="more-option" data-tab="analytics"><span class="more-option-icon" aria-hidden="true">↗</span><span class="more-option-copy"><strong>Catch analytics</strong><small>Species, seasons and fishing patterns</small></span><span class="more-chevron" aria-hidden="true">›</span></button>
         <button type="button" class="more-option" data-tab="settings">
           <span class="more-option-icon" aria-hidden="true">⚙</span>
           <span class="more-option-copy"><strong>Settings & backup</strong><small>Gemini connection, data export and import</small></span>
@@ -141,14 +154,12 @@
   <dialog id="catch-dialog" class="catch-dialog"><div id="dialog-content"></div><form method="dialog"><button class="button secondary" type="submit">Close</button></form></dialog>
   <footer>District Flatwater <span>•</span> Made for days on the water.</footer>
   <nav id="app-bottom-nav" class="bottom-nav" aria-label="Main navigation">
-    <button id="tab-log" class="bottom-nav-item active" type="button" data-tab="log" aria-current="page" aria-label="Log catch">
+    <button id="tab-home" class="bottom-nav-item active" type="button" data-tab="home" aria-current="page" aria-label="Home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v11h-6v-7H9v7H3z"/></svg><span>Home</span></button>
+    <button id="tab-log" class="bottom-nav-item" type="button" data-tab="log" aria-label="Log catch">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Log</span>
     </button>
     <button id="tab-gallery" class="bottom-nav-item" type="button" data-tab="gallery" aria-label="Catch gallery">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Gallery</span>
-    </button>
-    <button id="tab-analytics" class="bottom-nav-item" type="button" data-tab="analytics" aria-label="Catch analytics">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18M7 15l4-4 3 2 5-7"/></svg><span>Analytics</span>
     </button>
     <button id="tab-map" class="bottom-nav-item" type="button" data-tab="map" aria-label="Fishing locations map">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15"/></svg><span>Map</span>

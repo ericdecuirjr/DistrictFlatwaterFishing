@@ -2,7 +2,7 @@ name: Build District Flatwater Fishing APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, feature/photo-reference-measurement, fix/photo-zoom-fit, fix/s23-original-photo-gps, fix/s23-gps-build-3-8-2, feature/controlled-upgrade-3-9-0]
+    branches: [main, feature/photo-reference-measurement, fix/photo-zoom-fit, fix/s23-original-photo-gps, fix/s23-gps-build-3-8-2, feature/controlled-upgrade-3-9-0, feature/presentation-navigation-3-10-0]
 permissions:
   contents: read
 jobs:
@@ -72,6 +72,7 @@ jobs:
           path: |
             measure-mobile.png
             measure-fit-portrait.png
+            presentation-*.png
           if-no-files-found: ignore
       - name: Create Android project
         run: |
@@ -135,7 +136,7 @@ jobs:
           FILE=android/app/build.gradle
           grep -Eq '^[[:space:]]*versionCode[[:space:]]+[0-9]+' "$FILE"
           sed -i -E "s/^([[:space:]]*versionCode[[:space:]]+)[0-9]+/\1${VERSION_CODE}/" "$FILE"
-          sed -i -E 's/(versionName[[:space:]]+)"[^"]*"/\1"3.9.0"/' "$FILE"
+          sed -i -E 's/(versionName[[:space:]]+)"[^"]*"/\1"3.10.0"/' "$FILE"
           grep -n versionCode "$FILE"
       - name: Build test APK
         run: |
