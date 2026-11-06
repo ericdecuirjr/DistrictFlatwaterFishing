@@ -43,7 +43,7 @@ root.append(chart('Catches by month',months.sort((a,b)=>a[0].localeCompare(b[0])
 root.append(chart('Time of day',counts(catches,c=>{const d=new Date(c.capturedAt);return Number.isNaN(d.getTime())?null:String(d.getHours()).padStart(2,'0')+':00';}).sort((a,b)=>a[0].localeCompare(b[0]))));
 const ranges=[['Below 29.80',0],['29.80–29.99',0],['30.00–30.19',0],['30.20 and above',0]];for(const c of pressure){const x=c.weather.surfaceHpa*0.0295299830714;ranges[x<29.8?0:x<30?1:x<30.2?2:3][1]++;}root.append(chart('Catches by surface pressure (inHg)',ranges));root.append(el('p','df-analysis-note','Charts count logged catches only. They do not establish that particular times, weather conditions, or pressure readings cause fish to bite. Weather values are model estimates.'));
 }
-function filteredLocations(){return window.DistrictFlatwaterMapUtils.locations(catches,($('df-map-search')?.value||'').trim());}
+function filteredLocations(){return window.DistrictFlatwaterMapUtils.locations(catches,($('df-map-search')?.value||'').trim(),{lure:$('df-map-lure')?.value,spot:$('df-map-spot')?.value,favoriteOnly:$('df-map-favorite')?.checked});}
 function canLoadMap(){return !!window.DistrictFlatwaterNative||navigator.onLine;}
 function renderLocations(){
  const list=$('df-map-list'),status=$('df-map-status');
@@ -68,7 +68,7 @@ function renderLocations(){
  for(const record of rows.slice(0,100)){
    const item=el('div','df-map-item'),info=el('div');
    const label=window.DistrictFlatwaterMapUtils.sourceLabel(record.locationSource);
-   info.append(el('strong','',record.species||'Unidentified fish'),
+   info.append(el('strong','',(record.favoriteSpot?'★ ':'')+(record.spotName?record.spotName+' · ':'')+(record.species||'Unidentified fish')),
      el('small','',niceDate(record.capturedAt)+' · '+record.latitude.toFixed(6)+', '+record.longitude.toFixed(6)),
      el('small','', 'GPS source: '+label));
    const controls=el('div','df-map-item-controls');
@@ -193,6 +193,7 @@ function init(){
  main.insertBefore(analytics,$('screen-settings'));main.insertBefore(locations,$('screen-settings'));
  $('df-load-map').addEventListener('click',loadMap);
  input.addEventListener('input',renderLocations);
+ for(const [id,title,type] of [['df-map-lure','Filter by bait / lure','text'],['df-map-spot','Filter by spot name','text'],['df-map-favorite','Favorite spots only','checkbox']]){const label=el('label','',title),control=el('input');control.id=id;control.type=type;label.htmlFor=id;search.insertBefore(label,list);search.insertBefore(control,list);control.addEventListener('input',renderLocations);}
  const reload=button('df-refresh-map','Refresh saved locations','button secondary compact');reload.addEventListener('click',refresh);search.append(reload);
  document.addEventListener('df-tab-change',event=>{
    if(event.detail?.name==='analytics')renderAnalytics();

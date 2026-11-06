@@ -31,7 +31,7 @@ function sourceCounts(records){
   }
   return counts;
 }
-function locations(records,query=''){
+function locations(records,query='',options={}){
   const filter=String(query||'').trim().toLowerCase();
   if(!Array.isArray(records))return [];
   return records.reduce((all,record)=>{
@@ -39,6 +39,9 @@ function locations(records,query=''){
     const latitude=coordinate(record.latitude,90),longitude=coordinate(record.longitude,180);
     if(latitude===null||longitude===null)return all;
     if(filter&&!String(record.species||'').toLowerCase().includes(filter))return all;
+    if(options.favoriteOnly&&!record.favoriteSpot)return all;
+    if(options.lure&&!String(record.lure||'').toLowerCase().includes(String(options.lure).toLowerCase()))return all;
+    if(options.spot&&!String(record.spotName||'').toLowerCase().includes(String(options.spot).toLowerCase()))return all;
     // Normalize for map display only. Do not update the saved record.
     all.push({...record,latitude,longitude});
     return all;

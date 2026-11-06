@@ -38,8 +38,9 @@ export async function measurePhoto(blob, previous) {
   q('overlay').onpointerup=e=>{if(!dragging)return;dragging=false;if(selected<3&&!points[selected+1])selected++;render();};
   q('overlay').onpointercancel=()=>{dragging=false;};
   q('overlay').onkeydown=e=>{const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];if(!delta)return;e.preventDefault();const p=points[selected]||{x:.5,y:.5},n=e.shiftKey?10:1;points[selected]={x:Math.max(0,Math.min(1,p.x+delta[0]*n/image.naturalWidth)),y:Math.max(0,Math.min(1,p.y+delta[1]*n/image.naturalHeight))};render();};
-  q('preset').onchange=()=>{if(q('preset').value!=='custom'){q('dimension').value=q('preset').value;q('unit').value='in';}render();};
-  q('dimension').oninput=render;q('unit').onchange=render;
+  q('preset').onchange=()=>{if(q('preset').value!=='custom'){q('dimension').value=q('preset').value;q('unit').value='in';lastUnit='in';}render();};
+  let lastUnit=q('unit').value;
+  q('dimension').oninput=()=>{q('preset').value='custom';render();};q('unit').onchange=()=>{const value=Number(q('dimension').value);if(value>0)q('dimension').value=String(Number((lastUnit==='in'?value*2.54:value/2.54).toFixed(6)));lastUnit=q('unit').value;render();};
   q('pan').onchange=()=>{q('overlay').style.pointerEvents=q('pan').checked?'none':'auto';};
   function updateZoom(){
     const viewport=q('viewport'),zoom=Number(q('zoom').value);
