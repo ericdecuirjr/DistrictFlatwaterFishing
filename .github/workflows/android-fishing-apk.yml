@@ -2,7 +2,7 @@ name: Build District Flatwater Fishing APK
 on:
   workflow_dispatch:
   push:
-    branches: [feature/photo-reference-measurement, fix/photo-zoom-fit]
+    branches: [feature/photo-reference-measurement, fix/photo-zoom-fit, fix/s23-original-photo-gps]
 permissions:
   contents: read
 jobs:
@@ -87,12 +87,12 @@ jobs:
           main = package/'MainActivity.java'
           source = main.read_text()
           assert 'extends BridgeActivity' in source
-          source = source.replace('import com.getcapacitor.BridgeActivity;', 'import com.getcapacitor.BridgeActivity;\\nimport android.os.Bundle;')
+          source = source.replace('import com.getcapacitor.BridgeActivity;', 'import com.getcapacitor.BridgeActivity;' + chr(10) + 'import android.os.Bundle;')
           source = source.replace('public class MainActivity extends BridgeActivity {',
-            'public class MainActivity extends BridgeActivity {\\n'
-            '  @Override public void onCreate(Bundle savedInstanceState) {\\n'
-            '    registerPlugin(DistrictPhotoImportPlugin.class);\\n'
-            '    super.onCreate(savedInstanceState);\\n'
+            'public class MainActivity extends BridgeActivity {' + chr(10) +
+            '  @Override public void onCreate(Bundle savedInstanceState) {' + chr(10) +
+            '    registerPlugin(DistrictPhotoImportPlugin.class);' + chr(10) +
+            '    super.onCreate(savedInstanceState);' + chr(10) +
             '  }')
           main.write_text(source)
           assert 'registerPlugin(DistrictPhotoImportPlugin.class)' in main.read_text()
@@ -112,11 +112,13 @@ jobs:
           permissions = (
               '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n'
               '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n'
+              '    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />\n'
           )
           if 'android.permission.ACCESS_FINE_LOCATION' not in source:
               source = source.replace('<application', permissions+'    <application', 1)
           manifest.write_text(source)
           assert 'android.permission.ACCESS_FINE_LOCATION' in manifest.read_text()
+          assert 'android.permission.ACCESS_MEDIA_LOCATION' in manifest.read_text()
           PY
       - name: Set Android version code
         shell: bash
