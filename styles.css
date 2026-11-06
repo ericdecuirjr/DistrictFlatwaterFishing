@@ -192,3 +192,5 @@ button:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid #b4
  .connection{font-size:.65rem}
 }
 @media(prefers-reduced-motion:reduce){.screen{animation:none}}
+/* Keep save/error feedback clear of the fixed navigation. */
+.toast{bottom:calc(var(--df-nav-height) + var(--df-nav-safe) + 14px);z-index:140}
