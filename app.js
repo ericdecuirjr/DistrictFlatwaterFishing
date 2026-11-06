@@ -85,7 +85,7 @@ function tab(name){
   if(requested==='home')renderHome();if(requested==='gallery')renderGallery();if(requested==='settings')storageHealth();
   const heading=$('screen-'+requested)?.querySelector('h2');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
   document.dispatchEvent(new CustomEvent('df-tab-change',{detail:{name:requested}}));
-  window.scrollTo({top:0,behavior:'smooth'});
+  window.scrollTo({top:0,behavior:'instant'});
 }
 function showNetwork(){const online=navigator.onLine;$('network-dot').classList.toggle('online',online);$('network-label').textContent=online?'Online':'Offline';}
 function updateLocationUI(){const lat=draft.latitude,lon=draft.longitude;$('location-value').textContent=Number.isFinite(lat)&&Number.isFinite(lon)?`${lat.toFixed(5)}, ${lon.toFixed(5)}`:'Not captured';$('weather-btn').disabled=!(Number.isFinite(lat)&&Number.isFinite(lon));const w=draft.weather;$('temperature-value').textContent=w&&Number.isFinite(w.temperatureF)?`${Math.round(w.temperatureF)} °F`:'—';$('pressure-value').textContent=w&&Number.isFinite(w.surfaceHpa)?`${(w.surfaceHpa*.0295299830714).toFixed(2)} inHg`:'—';$('conditions-value').textContent=w?.conditions||'—';$('forecast-value').hidden=!w?.forecast;$('forecast-value').textContent=w?.forecast||'';

@@ -27,11 +27,11 @@ try {
  console.log('Navigation:',await send('Page.navigate',{url:'http://127.0.0.1:8765'}));await wait('window.__DF_CATCH_APP_BOOT?.initialized');await wait("!document.querySelector('#df-launch-splash')");console.log('Packaged app initialized');
  await wait("!document.querySelector('#screen-home').hidden");
  if(await evaluate("document.querySelector('.df-sticky-brand-shell').getBoundingClientRect().height")>100)throw Error('Shared header too tall');
- await writeFile('presentation-home-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+ await sleep(300);await writeFile('presentation-home-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await click('#tab-log');
  await wait("!document.querySelector('#screen-log').hidden");
  if(await evaluate("document.querySelector('#location-section').open||document.querySelector('#details-section').open"))throw Error('Optional form details should start collapsed');
- await writeFile('presentation-log-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+ await sleep(300);await wait("window.scrollY===0&&document.querySelector('.df-sticky-brand-shell').getBoundingClientRect().top===0");await writeFile('presentation-log-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await evaluate(`(async()=>{const c=document.createElement('canvas');c.width=1000;c.height=500;c.getContext('2d').fillRect(0,0,1000,500);const blob=await new Promise(r=>c.toBlob(r,'image/png'));const dt=new DataTransfer();dt.items.add(new File([blob],'measurement.png',{type:'image/png'}));const e=document.querySelector('#upload-input');e.files=dt.files;e.dispatchEvent(new Event('change',{bubbles:true}));})()`);
  await wait("!document.querySelector('#measure-photo').disabled");await click('#measure-photo');await wait("!!document.querySelector('[data-role=overlay]')");await fill('[data-role=dimension]','4');
  await evaluate("document.querySelector('[data-role=overlay]').scrollIntoView({block:'center'})");await sleep(200);
@@ -61,11 +61,11 @@ try {
   console.log('Whole photo fit and button zoom passed:',width,height);await click('[data-role=cancel]');
  }
  await click('#tab-home');await wait("document.querySelector('#home-recent').textContent.includes('North cove')");
- await writeFile('presentation-home-saved-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+ await sleep(300);await writeFile('presentation-home-saved-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await click('#tab-more');await click('[data-tab=analytics]');await wait("!document.querySelector('#screen-analytics').hidden");
  if(await evaluate("document.querySelector('#tab-more').getAttribute('aria-current')")!=='page')throw Error('Analytics should keep More active');
  await click('#tab-gallery');await fill('#catch-search','not-a-match');await wait("document.querySelector('#gallery-grid').children.length===0");
  await fill('#catch-search','North cove');await wait("document.querySelector('#gallery-grid').children.length===1");
- await writeFile('presentation-gallery-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+ await sleep(300);await writeFile('presentation-gallery-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  if(errors.length)throw Error(errors.join('; '));console.log('Mobile upload, endpoints, save, reload, restored measurement, zoom, pan, cancel and manual override passed');
 } finally {clearTimeout(timer);ws?.close();chrome?.kill('SIGKILL');server.closeAllConnections();server.close();}
