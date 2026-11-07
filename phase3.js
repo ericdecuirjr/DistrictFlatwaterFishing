@@ -63,6 +63,7 @@ function renderLocations(){
  if(intro)intro.textContent=rows.length?
   'Pins below are built only from coordinates in SAVED catch records. Phone-derived GPS means the phone location was saved when that catch was logged; it is not a fresh location lookup.':
   'No pins to display. Open a saved catch in Gallery → Edit to add or correct GPS coordinates.';
+ if(savedSpotPins.length){status.textContent+=' '+savedSpotPins.length+' saved fishing spot stars (unaffected by catch filters).';if(intro)intro.textContent='Catch pins use saved catch GPS; stars mark your saved fishing spots. Current phone GPS is never read from the Map screen.';}
  if(!rows.length){
    list.append(el('div','df-empty','No saved catch locations match. There is no automatic phone-location fallback.'));
  }
