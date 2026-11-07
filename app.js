@@ -328,8 +328,9 @@ async function selectPhoto(file){
     $('ai-result').hidden=true;
     if(!editingId){
       draft.capturedAt=new Date().toISOString();
-      draft.latitude=null;draft.longitude=null;draft.accuracy=null;draft.weather=null;
-      draft.timeSource='phone';draft.locationSource=null;
+      // Keep only explicitly selected trip context when adding its photo.
+      if(draft.locationSource!=='trip'){draft.latitude=null;draft.longitude=null;draft.accuracy=null;draft.weather=null;draft.locationSource=null;}
+      draft.timeSource='phone';
       $('caught-at').value=nowLocal(draft.capturedAt);
       updateLocationUI();
     }
