@@ -44,6 +44,17 @@ try {
  const records=await evaluate(`new Promise(resolve=>{const r=indexedDB.open('district-flatwater-catches-v1');r.onsuccess=()=>{const d=r.result,q=d.transaction('catches').objectStore('catches').getAll();q.onsuccess=()=>{resolve(q.result.map(({photo,...c})=>c));d.close()}}})`);
  assert(records.length===3&&records.find(c=>c.id==='legacy').notes==='preserve me','Legacy data preserved');
  assert(records.filter(c=>c.tripId).length===2,'Both catches linked');assert(records.find(c=>c.species==='Smallmouth bass').locationSource==='trip','Shared location provenance');
+ await evaluate("document.querySelector('#trip-history').parentElement.open=true;window.confirm=()=>false");
+ await click('#trip-history .trip-summary button:last-child');
+ assert(await evaluate("document.querySelector('#trip-history').textContent.includes('Sleeter')"),'Cancelled deletion keeps trip');
+ await evaluate('window.confirm=()=>true');await click('#trip-history .trip-summary button:last-child');
+ await wait("document.querySelector('#trip-history').children.length===0");
+ const kept=await evaluate(`new Promise(resolve=>{const r=indexedDB.open('district-flatwater-catches-v1');r.onsuccess=()=>{const d=r.result,q=d.transaction('catches').objectStore('catches').getAll();q.onsuccess=()=>{resolve(q.result.map(c=>({id:c.id,tripId:c.tripId,photoSize:c.photo.size,latitude:c.latitude})));d.close()}}})`);
+ assert(kept.length===3&&kept.every(c=>!c.tripId&&c.photoSize>0),'Deletion keeps photos and unlinks catches');
+ assert(kept.filter(c=>c.latitude===39.1).length===2,'Deletion preserves GPS');
+ await fill('#trip-name','Empty active trip');await click('#start-trip');await wait("document.querySelector('#trip-status').textContent.includes('Empty active trip')");
+ await click('#trip-history .trip-summary button:last-child');await wait("document.querySelector('#trip-status').textContent.includes('No active')");
+ console.log('Confirmed/cancelled trip deletion, active trip deletion and catch/photo/GPS preservation passed');
  await wait("!document.querySelector('#df-launch-splash')");await writeFile('/tmp/trip-mobile.png',Buffer.from((await send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  assert(!errors.length,errors.join('; '));console.log('Trips, quick entry, legacy preservation, tackle, shared GPS and reload checks passed');
 }finally{clearTimeout(timer);ws?.close();chrome?.kill();server.close();}
