@@ -6,7 +6,7 @@ const name='district-flatwater-catches-v1';
 const legacy=await new Promise((resolve,reject)=>{const r=indexedDB.open(name,1);r.onupgradeneeded=()=>r.result.createObjectStore('catches',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
 await new Promise((resolve,reject)=>{const tx=legacy.transaction('catches','readwrite');tx.objectStore('catches').put({id:'legacy',species:'Bass',photo:new Blob(['original']),unknownField:42});tx.oncomplete=resolve;tx.onabort=reject;});legacy.close();
 const source=readFileSync('app.js','utf8');
-const ctx=vm.createContext({indexedDB,DB_NAME:name,STORE:'catches',TRIPS:'trips',window:{__DF_CATCH_APP_BOOT:{}},Error});
+const ctx=vm.createContext({indexedDB,DB_NAME:name,STORE:'catches',TRIPS:'trips',SPOTS:'spots',window:{__DF_CATCH_APP_BOOT:{}},Error});
 vm.runInContext(source.slice(source.indexOf('function openDb()'),source.indexOf('async function deleteTrip')),ctx);
 ctx.db=await ctx.openDb();assert.equal(ctx.db.version,2);assert.equal((await ctx.getAll())[0].unknownField,42);assert.equal(await (await ctx.getAll())[0].photo.text(),'original');
 await ctx.putTrip({id:'trip1',name:'Lake morning',startedAt:'2026-11-07T12:00:00Z',endedAt:null});
@@ -19,5 +19,8 @@ const linked=await ctx.getOne('linked');assert.equal(linked.tripId,null);assert.
 await ctx.putTrip({id:'rollback',name:'Rollback',endedAt:null});await ctx.putCatch({id:'rollback-catch',tripId:'rollback',photo:new Blob(['safe'])});
 const realDb=ctx.db;ctx.db={transaction(...args){const tx=realDb.transaction(...args),objectStore=tx.objectStore.bind(tx);tx.objectStore=name=>{const store=objectStore(name);if(name==='trips')store.delete=()=>tx.abort();return store;};return tx;}};
 await assert.rejects(ctx.removeTrip('rollback'));ctx.db=realDb;assert.equal((await ctx.getOne('rollback-catch')).tripId,'rollback');assert.ok((await ctx.tripRows()).some(t=>t.id==='rollback'));ctx.db.close();
+ctx.db=await ctx.openDb();
+const spot={id:'spot1',name:'Launch',waterbody:'Lake',status:'want',access:'Public trail',launch:'Carry kayak',latitude:39,longitude:-77};ctx.validateSpot(spot);await ctx.writeSpot(spot);assert.equal((await ctx.spotRows())[0].launch,'Carry kayak');assert.throws(()=>ctx.validateSpot({...spot,latitude:91}));assert.throws(()=>ctx.validateSpot({...spot,longitude:null}));await ctx.writeSpot({...spot,status:'fished'});assert.equal((await ctx.spotRows())[0].status,'fished');await ctx.writeSpot(spot,true);assert.equal((await ctx.spotRows()).length,0);assert.ok(await ctx.getOne('legacy'));ctx.db.close();
+console.log('Saved spot validation, creation, editing, deletion and catch preservation passed');
 console.log('Trip deletion preserves catches, photos and GPS; unrelated trips and aborted transactions stay intact');
 console.log('Legacy database upgrade preserves photos and unknown fields; trips survive reopening without repeated upgrades');
