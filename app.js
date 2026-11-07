@@ -2,10 +2,10 @@
 (function districtFlatwaterCatchApp(){
 'use strict';
 if(window.__DF_CATCH_APP_BOOT) return;
-window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.11.0'};
+window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.11.1'};
 /* District Flatwater Fishing — Phase 1. No frameworks or tracking. */
 'use strict';
-const VERSION = '3.11.0';
+const VERSION = '3.11.1';
 const DB_NAME = 'district-flatwater-catches-v1';
 const STORE = 'catches';
 const TRIPS = 'trips';
@@ -75,6 +75,21 @@ function putCatch(record){return new Promise((resolve,reject)=>{const tx=db.tran
 function removeCatch(id){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
 function tripRows(){return new Promise((resolve,reject)=>{const r=db.transaction(TRIPS).objectStore(TRIPS).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 function putTrip(record){return new Promise((resolve,reject)=>{const tx=db.transaction(TRIPS,'readwrite');tx.objectStore(TRIPS).put(record);tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);tx.onerror=()=>{};});}
+// Detach catches and delete their trip in one transaction; photos and details stay intact.
+function removeTrip(id){return new Promise((resolve,reject)=>{
+ const tx=db.transaction([STORE,TRIPS],'readwrite');
+ tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('Trip deletion rolled back'));tx.onerror=()=>{};
+ const catches=tx.objectStore(STORE),cursor=catches.openCursor();
+ cursor.onsuccess=()=>{const row=cursor.result;if(!row)return;if(row.value.tripId===id)row.update({...row.value,tripId:null});row.continue();};
+ tx.objectStore(TRIPS).delete(id);
+});}
+async function deleteTrip(trip,button){
+ if(!confirm(`Delete trip “${trip.name}”? All catches, photos, GPS and weather will stay in your catch log. This removes only the trip and its catch links.`))return;
+ button.disabled=true;
+ try{await removeTrip(trip.id);await renderTrips();await refreshStats();notify('Trip deleted. All catches and photos kept.');}
+ catch(e){notify('Could not delete trip: '+e.message,true);}
+ finally{button.disabled=false;}
+}
 let activeTrip=null;
 async function renderTrips(){
  const trips=await tripRows(),catches=await getAll();activeTrip=trips.find(t=>!t.endedAt)||null;
@@ -85,7 +100,8 @@ async function renderTrips(){
  const rows=catches.filter(c=>c.tripId===trip.id),card=node('div','trip-summary');
  const minutes=Math.max(0,Math.round((Date.parse(trip.endedAt||new Date().toISOString())-Date.parse(trip.startedAt))/60000));
  card.append(node('strong',null,trip.name),node('p',null,`${prettyDate(trip.startedAt)} · ${trip.endedAt?'Completed':'Active'} · ${minutes} min · ${rows.length} catches`),node('p',null,[...new Set(rows.map(c=>c.species))].join(', ')||'No catches yet'));
- for(const row of rows){const b=node('button','button ghost compact',row.species+' · '+shortDate(row.capturedAt));b.type='button';b.onclick=()=>showCatch(row);card.append(b);}host.append(card);
+ for(const row of rows){const b=node('button','button ghost compact',row.species+' · '+shortDate(row.capturedAt));b.type='button';b.onclick=()=>showCatch(row);card.append(b);}
+ const remove=node('button','button ghost compact','Delete trip');remove.type='button';remove.setAttribute('aria-label','Delete trip '+trip.name);remove.onclick=()=>deleteTrip(trip,remove);card.append(remove);host.append(card);
  }
 }
 async function startTrip(){

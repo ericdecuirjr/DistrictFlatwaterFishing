@@ -7,8 +7,17 @@ const legacy=await new Promise((resolve,reject)=>{const r=indexedDB.open(name,1)
 await new Promise((resolve,reject)=>{const tx=legacy.transaction('catches','readwrite');tx.objectStore('catches').put({id:'legacy',species:'Bass',photo:new Blob(['original']),unknownField:42});tx.oncomplete=resolve;tx.onabort=reject;});legacy.close();
 const source=readFileSync('app.js','utf8');
 const ctx=vm.createContext({indexedDB,DB_NAME:name,STORE:'catches',TRIPS:'trips',window:{__DF_CATCH_APP_BOOT:{}},Error});
-vm.runInContext(source.slice(source.indexOf('function openDb()'),source.indexOf('let activeTrip=')),ctx);
+vm.runInContext(source.slice(source.indexOf('function openDb()'),source.indexOf('async function deleteTrip')),ctx);
 ctx.db=await ctx.openDb();assert.equal(ctx.db.version,2);assert.equal((await ctx.getAll())[0].unknownField,42);assert.equal(await (await ctx.getAll())[0].photo.text(),'original');
 await ctx.putTrip({id:'trip1',name:'Lake morning',startedAt:'2026-11-07T12:00:00Z',endedAt:null});
-assert.equal((await ctx.tripRows()).length,1);ctx.db.close();ctx.db=await ctx.openDb();assert.equal(ctx.db.version,2);assert.equal((await ctx.tripRows())[0].name,'Lake morning');assert.equal((await ctx.getAll()).length,1);ctx.db.close();
+assert.equal((await ctx.tripRows()).length,1);ctx.db.close();ctx.db=await ctx.openDb();assert.equal(ctx.db.version,2);assert.equal((await ctx.tripRows())[0].name,'Lake morning');assert.equal((await ctx.getAll()).length,1);await ctx.putCatch({id:'linked',tripId:'trip1',species:'Trout',latitude:39.1,longitude:-77.7,weather:{conditions:'Clear'},photo:new Blob(['linked photo']),notes:'keep',unknownField:99});
+await ctx.putTrip({id:'other',name:'Other trip',startedAt:'2026-11-07T12:00:00Z',endedAt:null});
+await ctx.putCatch({id:'other-catch',tripId:'other',photo:new Blob(['other'])});
+await ctx.removeTrip('trip1');
+const linked=await ctx.getOne('linked');assert.equal(linked.tripId,null);assert.equal(linked.unknownField,99);assert.equal(linked.latitude,39.1);assert.equal(linked.weather.conditions,'Clear');assert.equal(await linked.photo.text(),'linked photo');assert.equal((await ctx.getOne('other-catch')).tripId,'other');assert.equal((await ctx.getOne('legacy')).unknownField,42);assert.equal((await ctx.tripRows()).length,1);
+// Abort deletion to prove both the trip and its catch links roll back together.
+await ctx.putTrip({id:'rollback',name:'Rollback',endedAt:null});await ctx.putCatch({id:'rollback-catch',tripId:'rollback',photo:new Blob(['safe'])});
+const realDb=ctx.db;ctx.db={transaction(...args){const tx=realDb.transaction(...args),objectStore=tx.objectStore.bind(tx);tx.objectStore=name=>{const store=objectStore(name);if(name==='trips')store.delete=()=>tx.abort();return store;};return tx;}};
+await assert.rejects(ctx.removeTrip('rollback'));ctx.db=realDb;assert.equal((await ctx.getOne('rollback-catch')).tripId,'rollback');assert.ok((await ctx.tripRows()).some(t=>t.id==='rollback'));ctx.db.close();
+console.log('Trip deletion preserves catches, photos and GPS; unrelated trips and aborted transactions stay intact');
 console.log('Legacy database upgrade preserves photos and unknown fields; trips survive reopening without repeated upgrades');
