@@ -38,7 +38,7 @@ try {
  assert(await evaluate("document.querySelector('#gps-latitude').value===''") ,'GPS must not carry silently');
  await click('#use-trip-context');assert(await evaluate("document.querySelector('#gps-latitude').value==='39.1'"),'Explicit trip GPS');
  await photo();await fill('#species','Smallmouth bass');await click('#save-another');await wait("document.querySelector('#trip-history').textContent.includes('2 catches')");
- await send('Page.reload');await wait('window.__DF_CATCH_APP_BOOT?.initialized');await click('#tab-log');
+ await send('Page.reload');await wait('window.__DF_CATCH_APP_BOOT?.initialized');await wait("!document.querySelector('#df-launch-splash')");await click('#tab-log');await wait("!document.querySelector('#screen-log').hidden");
  assert(await evaluate("document.querySelector('#trip-status').textContent.includes('Sleeter')"),'Trip survives reload');
  await click('#end-trip');await wait("document.querySelector('#trip-status').textContent.includes('No active')");
  const records=await evaluate(`new Promise(resolve=>{const r=indexedDB.open('district-flatwater-catches-v1');r.onsuccess=()=>{const d=r.result,q=d.transaction('catches').objectStore('catches').getAll();q.onsuccess=()=>{resolve(q.result.map(({photo,...c})=>c));d.close()}}})`);
