@@ -27,6 +27,11 @@ try {
  console.log('Navigation:',await send('Page.navigate',{url:'http://127.0.0.1:8765'}));await wait('window.__DF_CATCH_APP_BOOT?.initialized');await wait("!document.querySelector('#df-launch-splash')");console.log('Packaged app initialized');
 
  const assert=(v,m)=>{if(!v)throw Error(m);};
+ await click('#tab-more');await click('[data-tab=spots]');await wait("!document.querySelector('#screen-spots').hidden");
+ await fill('#spot-title','Lake launch');await fill('#spot-waterbody','Sleeter Lake');await fill('#spot-access','Public access');await fill('#spot-launch','Carry kayak to water');await fill('#spot-lat','39.1');await fill('#spot-lon','-77.7');await click('#spot-save');await wait("document.querySelector('#saved-spots-list').textContent.includes('Lake launch')");
+ await click('#saved-spots-list button');await fill('#spot-status','fished');await click('#spot-save');await wait("document.querySelector('#saved-spots-list').textContent.includes('Fished')");
+ await send('Page.reload');await wait('window.__DF_CATCH_APP_BOOT?.initialized');await wait("!document.querySelector('#df-launch-splash')");await click('#tab-more');await click('[data-tab=spots]');await wait("document.querySelector('#saved-spots-list').textContent.includes('Carry kayak')");
+ assert(await evaluate("document.querySelector('#saved-spots-list').textContent.includes('Fished')"),'Saved spot survives reopen');console.log('Saved spot creation, editing and persistence passed');
  // Seed an older database before upgrade, then reload the app.
  await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('district-flatwater-catches-v1');r.onsuccess=()=>{const d=r.result,tx=d.transaction('catches','readwrite');tx.objectStore('catches').put({id:'legacy',species:'Bluegill',capturedAt:new Date().toISOString(),photo:new Blob(['old'],{type:'image/png'}),notes:'preserve me'});tx.oncomplete=()=>{d.close();resolve()};tx.onerror=reject;};})`);
  await click('#tab-log');await fill('#trip-name','Sleeter Lake morning');await click('#start-trip');await wait("document.querySelector('#trip-status').textContent.includes('Sleeter')");

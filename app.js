@@ -2,13 +2,14 @@
 (function districtFlatwaterCatchApp(){
 'use strict';
 if(window.__DF_CATCH_APP_BOOT) return;
-window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.11.1'};
+window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.12.0'};
 /* District Flatwater Fishing — Phase 1. No frameworks or tracking. */
 'use strict';
-const VERSION = '3.11.1';
+const VERSION = '3.12.0';
 const DB_NAME = 'district-flatwater-catches-v1';
 const STORE = 'catches';
 const TRIPS = 'trips';
+const SPOTS = 'spots';
 const nativeBridge = () => window.DistrictFlatwaterNative;
 const $ = id => document.getElementById(id);
 let db, photoBlob = null, previewUrl = null, editingId = null, draft = emptyDraft();
@@ -28,6 +29,7 @@ function openDb(){
     const boot=window.__DF_CATCH_APP_BOOT||{};
     function ensureStore(request){
       const database=request.result;
+      if(!database.objectStoreNames.contains(SPOTS))database.createObjectStore(SPOTS,{keyPath:'id'});
       if(!database.objectStoreNames.contains(TRIPS))database.createObjectStore(TRIPS,{keyPath:'id'});
       let store;
       if(!database.objectStoreNames.contains(STORE)){
@@ -55,7 +57,7 @@ function openDb(){
     request.onerror=()=>reject(request.error||Error('Cannot open catch database.'));
     request.onsuccess=()=>{
       const database=request.result;
-      if(database.objectStoreNames.contains(STORE)&&database.objectStoreNames.contains(TRIPS)){
+      if(database.objectStoreNames.contains(STORE)&&database.objectStoreNames.contains(TRIPS)&&database.objectStoreNames.contains(SPOTS)){
         finish(request,false);
         return;
       }
@@ -73,6 +75,34 @@ function getAll(){return new Promise((resolve,reject)=>{const req=db.transaction
 function getOne(id){return new Promise((resolve,reject)=>{const req=db.transaction(STORE,'readonly').objectStore(STORE).get(id);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 function putCatch(record){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(record);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
 function removeCatch(id){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
+function spotRows(){return new Promise((resolve,reject)=>{const r=db.transaction(SPOTS).objectStore(SPOTS).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
+function writeSpot(record,remove=false){return new Promise((resolve,reject)=>{const tx=db.transaction(SPOTS,'readwrite'),store=tx.objectStore(SPOTS);if(remove)store.delete(record.id);else store.put(record);tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);tx.onerror=()=>{};});}
+function validateSpot(s){
+ if(!s||typeof s.id!=='string'||!s.id||typeof s.name!=='string'||!s.name.trim()||s.name.length>100||!['want','fished'].includes(s.status))throw Error('Invalid saved spot');
+ for(const [k,max] of [['waterbody',100],['access',1500],['launch',1500]])if(typeof s[k]!=='string'||s[k].length>max)throw Error('Invalid spot notes');
+ const noGps=s.latitude===null&&s.longitude===null;
+ if(!noGps&&(!Number.isFinite(s.latitude)||Math.abs(s.latitude)>90||!Number.isFinite(s.longitude)||Math.abs(s.longitude)>180))throw Error('Invalid spot coordinates');
+ return s;
+}
+let spotEditingId=null;
+function clearSpot(){spotEditingId=null;for(const id of ['spot-title','spot-waterbody','spot-access','spot-launch','spot-lat','spot-lon'])$(id).value='';$('spot-status').value='want';$('spot-save').textContent='Save spot';}
+async function renderSpots(){
+ const rows=await spotRows(),host=$('saved-spots-list');host.replaceChildren();
+ const query=$('spot-search').value.trim().toLowerCase();
+ if(!rows.length)host.append(node('p',null,'Save a place you want to try—even before your first catch.'));
+ for(const spot of rows.filter(s=>[s.name,s.waterbody,s.access,s.launch].join(' ').toLowerCase().includes(query)).sort((a,b)=>a.name.localeCompare(b.name))){
+ const card=node('div','panel');card.append(node('h3',null,spot.name));appendInfo(card,'Waterbody',spot.waterbody);appendInfo(card,'Status',spot.status==='want'?'Want to try':'Fished');appendInfo(card,'Access notes',spot.access);appendInfo(card,'Kayak launch',spot.launch);
+ if(Number.isFinite(spot.latitude)){const a=node('a','button ghost compact','Open location');a.href='https://www.google.com/maps?q='+encodeURIComponent(spot.latitude+','+spot.longitude);a.target='_blank';a.rel='noopener noreferrer';card.append(a);}
+ const edit=node('button','button secondary compact','Edit spot');edit.type='button';edit.onclick=()=>{spotEditingId=spot.id;for(const [id,key] of [['spot-title','name'],['spot-waterbody','waterbody'],['spot-access','access'],['spot-launch','launch'],['spot-lat','latitude'],['spot-lon','longitude'],['spot-status','status']])$(id).value=spot[key]??'';$('spot-save').textContent='Update spot';$('spot-title').focus();};
+ const remove=node('button','button ghost compact','Delete spot');remove.type='button';remove.onclick=async()=>{if(!confirm('Delete '+spot.name+'? Your catches and trips will stay saved.'))return;try{await writeSpot(spot,true);if(spotEditingId===spot.id)clearSpot();await renderSpots();document.dispatchEvent(new Event('df-spots-changed'));}catch(e){notify('Could not delete spot: '+e.message,true);}};card.append(edit,remove);host.append(card);
+ }
+}
+async function saveSpot(){
+ const b=$('spot-save');if(b.disabled)return;b.disabled=true;
+ try{let coords={latitude:null,longitude:null};if($('spot-lat').value.trim()||$('spot-lon').value.trim())coords=window.DistrictFlatwaterCoordinates.parse($('spot-lat').value,$('spot-lon').value);
+ const record=validateSpot({id:spotEditingId||crypto.randomUUID(),name:$('spot-title').value.trim(),waterbody:$('spot-waterbody').value.trim(),status:$('spot-status').value,access:$('spot-access').value.trim(),launch:$('spot-launch').value.trim(),...coords,updatedAt:new Date().toISOString()});
+ await writeSpot(record);clearSpot();await renderSpots();document.dispatchEvent(new Event('df-spots-changed'));notify('Fishing spot saved.');}catch(e){notify(e.message,true);}finally{b.disabled=false;}
+}
 function tripRows(){return new Promise((resolve,reject)=>{const r=db.transaction(TRIPS).objectStore(TRIPS).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 function putTrip(record){return new Promise((resolve,reject)=>{const tx=db.transaction(TRIPS,'readwrite');tx.objectStore(TRIPS).put(record);tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);tx.onerror=()=>{};});}
 // Detach catches and delete their trip in one transaction; photos and details stay intact.
@@ -121,7 +151,7 @@ function rememberTackle(){try{localStorage.setItem('df-last-tackle',JSON.stringi
 function fillTackle(){try{const t=JSON.parse(localStorage.getItem('df-last-tackle')||'{}');$('lure').value=t.lure||'';$('technique').value=t.technique||'';}catch{}}
 function tab(name){
   const requested=$('screen-'+name)?name:'log';
-  const navName=['settings','diagnostics','analytics'].includes(requested)?'more':requested;
+  const navName=requested==='spots'?'more':['settings','diagnostics','analytics'].includes(requested)?'more':requested;
   document.querySelectorAll('main > .screen').forEach(screen=>{screen.hidden=screen.id!=='screen-'+requested;});
   // The branded banner now sits outside main and remains visible on every tab.
   document.querySelectorAll('#app-bottom-nav .bottom-nav-item').forEach(button=>{
@@ -130,7 +160,7 @@ function tab(name){
     if(active)button.setAttribute('aria-current','page');
     else button.removeAttribute('aria-current');
   });
-  if(requested==='home')renderHome();if(requested==='log')renderTrips();if(requested==='gallery')renderGallery();if(requested==='settings')storageHealth();
+  if(requested==='spots')renderSpots();if(requested==='home')renderHome();if(requested==='log')renderTrips();if(requested==='gallery')renderGallery();if(requested==='settings')storageHealth();
   const heading=$('screen-'+requested)?.querySelector('h2');if(heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}
   document.dispatchEvent(new CustomEvent('df-tab-change',{detail:{name:requested}}));
   window.scrollTo({top:0,behavior:'instant'});
@@ -417,7 +447,7 @@ async function renderGallery(){const list=await getAll();const select=$('species
 function showCatch(item){const box=$('dialog-content');box.replaceChildren();const img=node('img');const url=URL.createObjectURL(item.photo);img.src=url;img.alt=item.species;box.append(img,node('h3',null,item.species));appendInfo(box,'Date',prettyDate(item.capturedAt));if(item.timeSource==='photo-exif')appendInfo(box,'Date source','Original photo EXIF');if(item.locationSource==='photo-exif')appendInfo(box,'GPS source','Original photo EXIF');if(item.locationSource==='manual')appendInfo(box,'GPS source','Manual coordinates');if(item.locationSource==='phone')appendInfo(box,'GPS source','Phone at time of capture');if(Number.isFinite(item.latitude)&&Number.isFinite(item.longitude)){const p=node('p');p.append(node('strong',null,'GPS: '));const a=node('a',null,`${item.latitude.toFixed(5)}, ${item.longitude.toFixed(5)}`);a.href=`https://www.google.com/maps?q=${encodeURIComponent(item.latitude+','+item.longitude)}`;a.target='_blank';a.rel='noopener noreferrer';p.append(a);box.append(p);}if(item.weather){appendInfo(box,'Weather source',item.weather.source||'Not specified');if(item.weather.historical&&item.weather.observedAt)appendInfo(box,'Historical hour',prettyDate(item.weather.observedAt));appendInfo(box,'Temperature',Number.isFinite(item.weather.temperatureF)?Math.round(item.weather.temperatureF)+' °F':null);appendInfo(box,'Surface pressure',Number.isFinite(item.weather.surfaceHpa)?(item.weather.surfaceHpa*.0295299830714).toFixed(2)+' inHg':null);appendInfo(box,'Conditions',item.weather.conditions);appendInfo(box,'Forecast',item.weather.forecast);}appendInfo(box,item.photoMeasurement?'Estimated length (photo reference)':'Length',item.lengthIn?item.lengthIn+' in':null);const measure=node('button',null,'Measure photo');measure.type='button';measure.addEventListener('click',async()=>{$('catch-dialog').close();await editCatch(item.id);openPhotoMeasurement();});box.append(measure);appendInfo(box,'Weight',item.weightLb?item.weightLb+' lb':null);appendInfo(box,'Bait / lure',item.lure);appendInfo(box,'Technique',item.technique);if(item.tripId)tripRows().then(rows=>appendInfo(box,'Trip',rows.find(t=>t.id===item.tripId)?.name));if(item.locationSource==='trip')appendInfo(box,'GPS source','Shared trip location');appendInfo(box,'Spot',item.spotName);appendInfo(box,'Favorite spot',item.favoriteSpot?'Yes':null);appendInfo(box,'Notes',item.notes);const actions=node('div','detail-actions');for(const [label,action] of [['Edit catch',()=>editCatch(item.id)],['Delete catch',()=>deleteCatch(item.id)]]){const button=node('button','button secondary',label);button.type='button';button.onclick=()=>{$('catch-dialog').close();action();};actions.append(button);}box.append(actions);if(item.aiSuggestion)appendInfo(box,'Gemini suggestion',item.aiSuggestion+' ('+(item.aiConfidence||'unknown')+' confidence)');$('catch-dialog').showModal();$('catch-dialog').addEventListener('close',()=>URL.revokeObjectURL(url),{once:true});}
 async function editCatch(id){const item=await getOne(id);if(!item)return;cancelHistoricalPreview();editingId=id;++contextToken;draft={photoMeasurement:item.photoMeasurement||null,capturedAt:item.capturedAt,latitude:item.latitude,longitude:item.longitude,accuracy:item.accuracy,weather:item.weather,aiSuggestion:item.aiSuggestion||null,aiConfidence:item.aiConfidence||null,scientificName:item.scientificName||null,timeSource:item.timeSource||null,locationSource:item.locationSource||null};selectedMetadata=null;$('metadata-panel').hidden=true;photoBlob=item.photo;$('species').value=item.species;$('caught-at').value=nowLocal(item.capturedAt);$('length').value=item.lengthIn??'';$('weight').value=item.weightLb??'';$('lure').value=item.lure||'';$('technique').value=item.technique||'';$('save-another').hidden=true;$('notes').value=item.notes||'';$('spot-name').value=item.spotName||'';$('favorite-spot').checked=!!item.favoriteSpot;$('ai-result').hidden=!item.aiSuggestion;if(item.aiSuggestion)$('ai-result').textContent='Previous Gemini suggestion: '+item.aiSuggestion;updatePhotoPreview();updateLocationUI();$('location-section').open=true;$('details-section').open=true;$('edit-label').hidden=false;$('cancel-edit').hidden=false;$('save-btn').textContent='Update catch';tab('log');}
 async function deleteCatch(id){const item=await getOne(id);if(!item||!confirm(`Delete the ${item.species} catch from ${shortDate(item.capturedAt)}? This cannot be undone.`))return;await removeCatch(id);document.dispatchEvent(new CustomEvent('df-catches-changed',{detail:{kind:'delete',id}}));notify('Catch deleted.');await refreshStats();await renderGallery();}
-async function exportBackup(){const catches=await getAll();$('export-btn').disabled=true;try{const rows=[];for(const c of catches){const {photo,...details}=c;rows.push({...details,photoDataUrl:`data:${photo.type||'image/jpeg'};base64,${await blobBase64(photo)}`});}const payload={application:'district-flatwater-fishing',formatVersion:1,exportedAt:new Date().toISOString(),trips:await tripRows(),catches:rows};const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='district-flatwater-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);localStorage.setItem('df-last-backup',new Date().toISOString());storageHealth();notify(`Backup download requested for ${rows.length} catches. Keep the downloaded file somewhere safe.`);}catch(e){notify('Backup failed: '+e.message,true);}finally{$('export-btn').disabled=false;}}
+async function exportBackup(){const catches=await getAll();$('export-btn').disabled=true;try{const rows=[];for(const c of catches){const {photo,...details}=c;rows.push({...details,photoDataUrl:`data:${photo.type||'image/jpeg'};base64,${await blobBase64(photo)}`});}const payload={application:'district-flatwater-fishing',formatVersion:1,exportedAt:new Date().toISOString(),trips:await tripRows(),spots:await spotRows(),catches:rows};const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='district-flatwater-backup-'+new Date().toISOString().slice(0,10)+'.json';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);localStorage.setItem('df-last-backup',new Date().toISOString());storageHealth();notify(`Backup download requested for ${rows.length} catches, ${payload.trips.length} trips and ${payload.spots.length} spots. Keep the downloaded file somewhere safe.`);}catch(e){notify('Backup failed: '+e.message,true);}finally{$('export-btn').disabled=false;}}
 function dataUrlToBlob(uri){const match=/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(uri||'');if(!match)throw Error('Invalid photo in backup');const bin=atob(match[2]);const bytes=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);return new Blob([bytes],{type:match[1]});}
 async function importBackup(file){
  if(!file)return;
@@ -434,19 +464,21 @@ async function importBackup(file){
    return record;
   });
   const trips=data.trips||[];const tripIds=new Set();if(!Array.isArray(trips)||trips.length>10000)throw Error('Invalid trips');for(const t of trips){if(!t||typeof t.id!=='string'||!t.id||tripIds.has(t.id)||typeof t.name!=='string'||!t.name.trim()||t.name.length>100||!Number.isFinite(Date.parse(t.startedAt))||(t.endedAt!==null&&!Number.isFinite(Date.parse(t.endedAt))))throw Error('Invalid trip');tripIds.add(t.id);}
+  const spots=data.spots??[];if(!Array.isArray(spots)||spots.length>10000)throw Error('Invalid saved spots');const spotIds=new Set();for(const spot of spots){validateSpot(spot);if(spotIds.has(spot.id))throw Error('Duplicate spot ID');spotIds.add(spot.id);}
   const existing=new Set((await getAll()).map(c=>c.id));
   const added=rows.filter(c=>!existing.has(c.id)).length;
-  if(!confirm(`Backup checked: ${rows.length} catches with photos and ${trips.length} trips. Add ${added} new catches? Existing matching catches will be kept. Nothing will be deleted.`))return;
+  if(!confirm(`Backup checked: ${rows.length} catches with photos and ${trips.length} trips and ${spots.length} saved spots. Add ${added} new catches? Existing matching catches will be kept. Nothing will be deleted.`))return;
   // The read and add are in one transaction: concurrent saves cannot be overwritten.
   let count=0;
   await new Promise((resolve,reject)=>{
-   const tx=db.transaction([STORE,TRIPS],'readwrite'),store=tx.objectStore(STORE);
+   const tx=db.transaction([STORE,TRIPS,SPOTS],'readwrite'),store=tx.objectStore(STORE);
+   const spotStore=tx.objectStore(SPOTS);for(const spot of spots){const r=spotStore.get(spot.id);r.onsuccess=()=>{if(!r.result)spotStore.add(spot);};}
    const tripStore=tx.objectStore(TRIPS);for(const trip of trips){const req=tripStore.get(trip.id);req.onsuccess=()=>{if(!req.result)tripStore.add({id:trip.id,name:trip.name,startedAt:trip.startedAt,endedAt:trip.endedAt||new Date().toISOString(),context:null});};}
    tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error||Error('Restore rolled back'));tx.onerror=()=>{};
    for(const record of rows){const req=store.get(record.id);req.onsuccess=()=>{if(!req.result){store.add(record);count++;}};}
   });
   document.dispatchEvent(new CustomEvent('df-catches-changed',{detail:{kind:'import',count}}));
-  await renderTrips();await refreshStats();notify(`Restored ${count} catches. Kept ${rows.length-count} existing matches.`);tab('gallery');
+  document.dispatchEvent(new Event('df-spots-changed'));await renderTrips();await refreshStats();notify(`Restored ${count} catches. Kept ${rows.length-count} existing matches.`);tab('gallery');
  }catch(e){notify('Import failed; no partial restore: '+e.message,true);}
  finally{$('import-file').value='';$('import-btn').disabled=false;}
 }
@@ -469,7 +501,7 @@ async function openPhotoMeasurement(){
  }catch(e){notify('Measurement: '+e.message,true);}
 }
 
-async function init(){try{db=await openDb();}catch(e){window.__DF_CATCH_APP_BOOT.storageError=String(e?.message||e);notify('Storage unavailable. Check private browsing settings.',true);return;}$('version').textContent=VERSION;resetForm();showNetwork();$('proxy-url').value=configuredProxy();for(const button of document.querySelectorAll('[data-tab]'))button.addEventListener('click',()=>tab(button.dataset.tab));$('home-log').addEventListener('click',()=>{resetForm();tab('log');});$('catch-search').addEventListener('input',renderGallery);$('new-from-gallery').addEventListener('click',()=>{resetForm();tab('log');});$('take-photo').addEventListener('click',async()=>{if(!nativeBridge()?.pickPhoto){$('camera-input').click();return;}try{await selectPhoto(await nativeBridge().pickPhoto('camera'));}catch(e){notify('Camera: '+(e?.message||String(e)),true);}});
+async function init(){try{db=await openDb();}catch(e){window.__DF_CATCH_APP_BOOT.storageError=String(e?.message||e);notify('Storage unavailable. Check private browsing settings.',true);return;}window.DistrictFlatwaterSpots={getAll:spotRows};$('spot-save').onclick=saveSpot;$('spot-clear').onclick=clearSpot;$('spot-search').oninput=renderSpots;$('spot-phone').onclick=()=>{if(!navigator.geolocation){notify('Phone GPS unavailable.',true);return;}navigator.geolocation.getCurrentPosition(p=>{$('spot-lat').value=p.coords.latitude;$('spot-lon').value=p.coords.longitude;},e=>notify('GPS: '+e.message,true),{enableHighAccuracy:true,timeout:15000});};$('version').textContent=VERSION;resetForm();showNetwork();$('proxy-url').value=configuredProxy();for(const button of document.querySelectorAll('[data-tab]'))button.addEventListener('click',()=>tab(button.dataset.tab));$('home-log').addEventListener('click',()=>{resetForm();tab('log');});$('catch-search').addEventListener('input',renderGallery);$('new-from-gallery').addEventListener('click',()=>{resetForm();tab('log');});$('take-photo').addEventListener('click',async()=>{if(!nativeBridge()?.pickPhoto){$('camera-input').click();return;}try{await selectPhoto(await nativeBridge().pickPhoto('camera'));}catch(e){notify('Camera: '+(e?.message||String(e)),true);}});
 $('choose-photo').addEventListener('click',async()=>{if(!nativeBridge()?.pickPhoto){$('upload-input').click();return;}try{await selectPhoto(await nativeBridge().pickPhoto('gallery'));}catch(e){notify('Photo selection: '+(e?.message||String(e)),true);}});$('choose-original').addEventListener('click',async()=>{if(!nativeBridge()?.pickOriginalFile)return;try{await selectPhoto(await nativeBridge().pickOriginalFile());}catch(e){if(!/cancel/i.test(String(e?.message||e)))notify('Original photo: '+(e?.message||String(e)),true);}});$('camera-input').addEventListener('change',e=>{selectPhoto(e.target.files[0]);e.target.value='';});$('upload-input').addEventListener('change',e=>{selectPhoto(e.target.files[0]);e.target.value='';});$('historical-lookup-btn').addEventListener('click',lookupHistoricalWeather);$('historical-apply-btn').addEventListener('click',applyHistoricalWeather);$('historical-discard-btn').addEventListener('click',()=>{$('historical-status').textContent='Historical weather result discarded; no changes made.';cancelHistoricalPreview();$('historical-status').textContent='Historical weather result discarded; no changes made.';});$('caught-at').addEventListener('input',()=>{cancelHistoricalPreview();if(draft.weather){draft.weather=null;updateLocationUI();}});$('metadata-apply').addEventListener('click',applyMetadata);$('metadata-skip').addEventListener('click',()=>{$('metadata-actions').hidden=true;$('metadata-summary').textContent+=' · Kept existing values. Use Capture GPS & weather for current location.';});$('manual-gps-btn').addEventListener('click',applyManualGps);$('phone-gps-btn').addEventListener('click',()=>captureLocation(false));$('location-btn').addEventListener('click',()=>captureLocation(true));$('weather-btn').addEventListener('click',()=>fetchWeather());$('identify-btn').addEventListener('click',identify);$('measure-photo').addEventListener('click',openPhotoMeasurement);$('length').addEventListener('input',()=>{draft.photoMeasurement=null;updateMeasurementLabel();});$('save-btn').addEventListener('click',()=>saveCatch(false));$('save-another').addEventListener('click',()=>saveCatch(true));$('start-trip').addEventListener('click',startTrip);$('end-trip').addEventListener('click',endTrip);$('use-trip-context').addEventListener('click',useTripContext);$('cancel-edit').addEventListener('click',()=>{resetForm();tab('gallery');});$('species-filter').addEventListener('change',renderGallery);$('sort-by').addEventListener('change',renderGallery);$('save-proxy').addEventListener('click',saveProxy);$('protect-storage').addEventListener('click',async()=>{try{await navigator.storage?.persist?.();await storageHealth();}catch{notify('Storage protection unavailable; export a backup.',true);}});$('export-btn').addEventListener('click',exportBackup);$('import-btn').addEventListener('click',()=>$('import-file').click());$('import-file').addEventListener('change',e=>importBackup(e.target.files[0]));document.addEventListener('df-edit-catch',event=>{const id=event.detail?.id;if(typeof id==='string'&&id)editCatch(id).catch(e=>notify('Cannot open catch: '+e.message,true));});window.addEventListener('online',showNetwork);window.addEventListener('offline',showNetwork);await renderTrips();await refreshStats();await renderHome();window.__DF_CATCH_APP_BOOT.initialized=true;document.dispatchEvent(new Event('df-catch-ready'));if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./sw.js').catch(()=>{});}
 document.addEventListener('DOMContentLoaded',init);
 
