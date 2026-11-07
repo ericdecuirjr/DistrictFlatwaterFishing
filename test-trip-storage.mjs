@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFileSync} from 'node:fs';
+import {indexedDB} from 'fake-indexeddb';
+const name='district-flatwater-catches-v1';
+const legacy=await new Promise((resolve,reject)=>{const r=indexedDB.open(name,1);r.onupgradeneeded=()=>r.result.createObjectStore('catches',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+await new Promise((resolve,reject)=>{const tx=legacy.transaction('catches','readwrite');tx.objectStore('catches').put({id:'legacy',species:'Bass',photo:new Blob(['original']),unknownField:42});tx.oncomplete=resolve;tx.onabort=reject;});legacy.close();
+const source=readFileSync('app.js','utf8');
+const ctx=vm.createContext({indexedDB,DB_NAME:name,STORE:'catches',TRIPS:'trips',window:{__DF_CATCH_APP_BOOT:{}},Error});
+vm.runInContext(source.slice(source.indexOf('function openDb()'),source.indexOf('let activeTrip=')),ctx);
+ctx.db=await ctx.openDb();assert.equal(ctx.db.version,2);assert.equal((await ctx.getAll())[0].unknownField,42);assert.equal(await (await ctx.getAll())[0].photo.text(),'original');
+await ctx.putTrip({id:'trip1',name:'Lake morning',startedAt:'2026-11-07T12:00:00Z',endedAt:null});
+assert.equal((await ctx.tripRows()).length,1);ctx.db.close();ctx.db=await ctx.openDb();assert.equal(ctx.db.version,2);assert.equal((await ctx.tripRows())[0].name,'Lake morning');assert.equal((await ctx.getAll()).length,1);ctx.db.close();
+console.log('Legacy database upgrade preserves photos and unknown fields; trips survive reopening without repeated upgrades');
