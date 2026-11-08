@@ -2,7 +2,7 @@ name: Build District Flatwater Fishing APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, feature/photo-reference-measurement, fix/photo-zoom-fit, fix/s23-original-photo-gps, fix/s23-gps-build-3-8-2, feature/controlled-upgrade-3-9-0, feature/presentation-navigation-3-10-0, feature/trips-quick-catch, feature/delete-trip, feature/saved-spots-measurement]
+    branches: [main, feature/photo-reference-measurement, fix/photo-zoom-fit, fix/s23-original-photo-gps, fix/s23-gps-build-3-8-2, feature/controlled-upgrade-3-9-0, feature/presentation-navigation-3-10-0, feature/trips-quick-catch, feature/delete-trip, feature/saved-spots-measurement, feature/batch-catches]
 permissions:
   contents: read
 jobs:
@@ -67,6 +67,7 @@ jobs:
         run: |
           timeout 120s node test-photo-measurement-browser.mjs
           timeout 120s node test-trips-browser.mjs
+          timeout 120s node test-batch-browser.mjs
       - name: Upload measurement preview
         if: always()
         uses: actions/upload-artifact@v4
