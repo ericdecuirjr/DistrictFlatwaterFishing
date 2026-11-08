@@ -42,3 +42,11 @@
  .df-map-item{flex-direction:column}
  .df-map-item-controls{justify-content:flex-start;max-width:100%}
 }
+
+.df-map-toggle{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+.df-map-toggle .button{flex:1;min-height:44px}
+.df-map-toggle [aria-pressed="true"]{background:#0b653c;color:white;border-color:#0b653c}
+.df-pin-fished{background:#15803d;color:white}
+.df-pin-want{background:#facc15;color:#352b00}
+.df-spot-legend{display:flex;gap:20px;flex-wrap:wrap;font-weight:700}
+.df-legend-fished{color:#15803d}.df-legend-want{color:#786000}

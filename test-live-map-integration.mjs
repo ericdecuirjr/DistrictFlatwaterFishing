@@ -51,7 +51,8 @@ const indexedDB={
   return req;
  }
 };
-const calls={created:0,markers:0,center:null,fit:0};
+const spots=[];
+const calls={created:0,markers:0,center:null,fit:0,icons:[]};
 const leaflet={
  map(){calls.created++;return {
   setView(coords){calls.center=coords;return this;},
@@ -63,11 +64,11 @@ const leaflet={
   getBounds(){return {pad(){return this;}}}
  };return layer;},
  marker(coords){return {coords,bindPopup(){return this;},openPopup(){return this;}};},
- divIcon(opts){return opts;},
+ divIcon(opts){calls.icons.push(opts.html);return opts;},
  tileLayer(){return {on(){return this;},addTo(){return this;}};}
 };
 const windowObj={__DF_CATCH_APP_BOOT:{initialized:true},L:leaflet,
- DistrictFlatwaterNative:{isNative:true},addEventListener(){}};
+ DistrictFlatwaterSpots:{getAll:async()=>spots},DistrictFlatwaterNative:{isNative:true},addEventListener(){}};
 const sandbox={window:windowObj,document:fakeDocument,indexedDB,
  navigator:{onLine:true},console,Date,Map,Number,String,Array,Math,Promise,
  requestAnimationFrame:fn=>fn(),CustomEvent:class {constructor(type,opts){this.type=type;this.detail=opts?.detail;} },
@@ -125,3 +126,23 @@ assert.equal(calls.markers,2,'Deleted catch pin removed without restart');
 await flush();
 assert.equal(calls.created,1);
 console.log('Live catch save/edit/delete -> visible GPS map integration passed');
+
+spots.push({id:'green',name:'Fished lake',status:'fished',latitude:39,longitude:-77},{id:'yellow',name:'New lake',status:'want',latitude:40,longitude:-78});
+fakeDocument.dispatchEvent({type:'df-spots-changed'});await flush();
+assert.equal(calls.markers,2,'Catch map excludes saved spot pins');
+calls.icons=[];registry.get('df-mode-spots').onclick();await flush();
+assert.equal(calls.markers,2,'Saved spots map excludes catch pins');
+assert.ok(calls.icons.some(x=>x.includes('df-pin-fished')),'Fished pin uses green class');
+assert.ok(calls.icons.some(x=>x.includes('df-pin-want')),'Want to try pin uses yellow class');
+assert.equal(registry.get('df-map-filters').hidden,true);
+assert.equal(registry.get('df-mode-spots')['aria-pressed'],'true');
+spots[1].status='fished';calls.icons=[];
+fakeDocument.dispatchEvent({type:'df-spots-changed'});await flush();
+assert.ok(calls.icons.every(x=>x.includes('df-pin-fished')),'Status edit recolors pins immediately');
+spots.splice(0);fakeDocument.dispatchEvent({type:'df-spots-changed'});await flush();
+assert.equal(calls.markers,0,'Deleting saved spots clears map');
+registry.get('df-mode-catches').onclick();await flush();
+assert.equal(calls.markers,2,'Switching back restores catch pins');
+assert.equal(registry.get('df-map-filters').hidden,false);
+assert.equal(calls.created,1,'Toggle reuses map');
+console.log('Map toggle, status colors, live spot edits/deletes and catch isolation passed');

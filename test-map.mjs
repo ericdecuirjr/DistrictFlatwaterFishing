@@ -30,7 +30,7 @@ assert.equal(groups.find(g=>g.latitude===38.8895)?.items.length,2);
 assert.ok(groups.some(g=>g.latitude===0&&g.longitude===0));
 const phase=readFileSync('phase3.js','utf8');
 assert.ok(phase.includes("event.detail?.name==='map'"),'Map tab handler exists');
-assert.ok(phase.includes("if(filteredLocations().length&&canLoadMap()&&!loadingMap)loadMap()"),'Entering Map auto-loads saved GPS pins when available');
+assert.ok(phase.includes("if(activeLocations().length&&canLoadMap()&&!loadingMap)loadMap()"),'Entering Map auto-loads saved GPS pins when available');
 assert.ok(phase.includes("function canLoadMap(){return !!window.DistrictFlatwaterNative||navigator.onLine;}"),'Native map pin rendering can initialize offline');
 assert.ok(phase.includes('refreshSequence'),'Async catch list reloads reject outdated results');
 assert.ok(phase.includes('groupPins(filteredLocations())'),'Pins must be grouped from filtered GPS locations');
