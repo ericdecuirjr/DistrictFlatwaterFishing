@@ -6,7 +6,8 @@ const DB_NAME='district-flatwater-catches-v1', STORE='catches';
 const $=id=>document.getElementById(id);
 const el=(tag,cls,value)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(value!==undefined)node.textContent=String(value);return node;};
 const niceDate=iso=>{const d=new Date(iso);return Number.isNaN(d.valueOf())?'Unknown date':d.toLocaleDateString();};
-let savedSpotPins=[];
+let savedSpotPins=[],mapMode='catches';
+function activeLocations(){return mapMode==='spots'?savedSpotPins:filteredLocations();}
 let catches=[],map=null,markers=null,loadingMap=false;
 let markerByKey=new Map();
 let refreshSequence=0;
@@ -21,8 +22,8 @@ function chart(title,rows){const p=panel(title);if(!rows.length){p.append(el('di
 function counts(data,keyFn){const m=new Map();for(const item of data){const key=keyFn(item);if(key!==null&&key!==undefined&&key!=='')m.set(key,(m.get(key)||0)+1);}return [...m].sort((a,b)=>b[1]-a[1]);}
 async function refresh(){
  const sequence=++refreshSequence;
- let rows;
- try{rows=await readCatches();savedSpotPins=(await window.DistrictFlatwaterSpots?.getAll?.()||[]).filter(s=>Number.isFinite(s.latitude)&&Number.isFinite(s.longitude));}
+ let rows,spots;
+ try{rows=await readCatches();spots=(await window.DistrictFlatwaterSpots?.getAll?.()||[]).filter(s=>Number.isFinite(s.latitude)&&Number.isFinite(s.longitude));}
  catch(e){
   if(sequence===refreshSequence){
    console.error('Unable to read catch log',e);
@@ -33,7 +34,7 @@ async function refresh(){
  }
  // Prevent an older async IndexedDB read from overwriting newer saved catches.
  if(sequence!==refreshSequence)return false;
- catches=rows;
+ catches=rows;savedSpotPins=spots;
  if(!$('screen-analytics').hidden)renderAnalytics();
  if(!$('screen-map').hidden)renderLocations();
  return true;
@@ -50,6 +51,7 @@ function renderLocations(){
  const list=$('df-map-list'),status=$('df-map-status');
  if(!list||!status)return;
  list.replaceChildren();
+ if(mapMode==='spots'){renderSpotLocations(list,status);return;}
  const rows=filteredLocations();
  const groups=window.DistrictFlatwaterMapUtils.groupPins(rows);
  const counts=window.DistrictFlatwaterMapUtils.sourceCounts(rows);
@@ -63,7 +65,7 @@ function renderLocations(){
  if(intro)intro.textContent=rows.length?
   'Pins below are built only from coordinates in SAVED catch records. Phone-derived GPS means the phone location was saved when that catch was logged; it is not a fresh location lookup.':
   'No pins to display. Open a saved catch in Gallery → Edit to add or correct GPS coordinates.';
- if(savedSpotPins.length){status.textContent+=' '+savedSpotPins.length+' saved fishing spot stars (unaffected by catch filters).';if(intro)intro.textContent='Catch pins use saved catch GPS; stars mark your saved fishing spots. Current phone GPS is never read from the Map screen.';}
+
  if(!rows.length){
    list.append(el('div','df-empty','No saved catch locations match. There is no automatic phone-location fallback.'));
  }
@@ -90,6 +92,27 @@ function renderLocations(){
  if(rows.length>100)list.append(el('p','df-analysis-note','Showing 100 recent catches in the list. The map includes every matching saved catch.'));
  if(map)updateMarkers();
 }
+function renderSpotLocations(list,status){
+ status.textContent=savedSpotPins.length+' saved fishing spot'+(savedSpotPins.length===1?'':'s')+' with GPS coordinates.';
+ $('df-map-source-note').textContent='Green pins: Fished. Yellow pins: Want to try. Only saved spot coordinates are used.';
+ $('df-map-live-status').textContent='Map synchronized with saved fishing spots.';
+ if(!savedSpotPins.length)list.append(el('div','df-empty','No saved spots with GPS yet. Add coordinates in Saved spots & kayak launches.'));
+ for(const spot of savedSpotPins){
+  const item=el('div','df-map-item'),info=el('div');
+  info.append(el('strong','',spot.name),el('small','',(spot.status==='fished'?'Fished':'Want to try')+(spot.waterbody?' · '+spot.waterbody:'')),el('small','',spot.latitude.toFixed(6)+', '+spot.longitude.toFixed(6)));
+  const focus=button('','Show pin','button secondary compact');focus.onclick=()=>focusSavedPin(spot);
+  item.append(info,focus);list.append(item);
+ }
+ if(map)updateMarkers();
+}
+function setMapMode(mode){
+ mapMode=mode;
+ for(const value of ['catches','spots'])$('df-mode-'+value).setAttribute('aria-pressed',String(value===mode));
+ $('df-map-heading').textContent=mode==='spots'?'Saved fishing spots map':'Catch map';
+ $('df-map-filters').hidden=mode==='spots';$('df-spot-legend').hidden=mode!=='spots';
+ renderLocations();
+ refresh().then(current=>{if(current&&!map&&activeLocations().length&&canLoadMap())loadMap();});
+}
 async function focusSavedPin(record){
  const lat=window.DistrictFlatwaterMapUtils.coordinate(record.latitude,90);
  const lon=window.DistrictFlatwaterMapUtils.coordinate(record.longitude,180);
@@ -102,7 +125,7 @@ async function focusSavedPin(record){
  requestAnimationFrame(()=>requestAnimationFrame(()=>{
    if(!map)return;
    map.setView([lat,lon],15,{animate:false});
-   const key=window.DistrictFlatwaterMapUtils.pinKey(lat,lon);
+   const key=mapMode==='spots'?'spot:'+record.id:window.DistrictFlatwaterMapUtils.pinKey(lat,lon);
    const pin=markerByKey.get(key);
    if(pin)pin.openPopup();
  }));
@@ -113,7 +136,7 @@ function updateMarkers(){
  if(!map||!window.L)return;
  if(markers)map.removeLayer(markers);
  markers=L.featureGroup();markerByKey=new Map();
- const groups=window.DistrictFlatwaterMapUtils.groupPins(filteredLocations());
+ const groups=mapMode==='catches'?window.DistrictFlatwaterMapUtils.groupPins(filteredLocations()):[];
  for(const group of groups){
    const count=group.items.length;
    const icon=L.divIcon({
@@ -131,10 +154,11 @@ function updateMarkers(){
    if(count>12)popup.append(el('div','',(count-12)+' additional catches at this spot'));
    marker.bindPopup(popup);markerByKey.set(group.key,marker);markers.addLayer(marker);
  }
- for(const spot of savedSpotPins){const popup=el('div');popup.append(el('strong','',spot.name),el('p','',(spot.status==='want'?'Want to try':'Fished')+' · '+spot.waterbody),el('p','',spot.access),el('p','',spot.launch));markers.addLayer(L.marker([spot.latitude,spot.longitude],{icon:L.divIcon({className:'df-location-icon',html:'<span class="df-map-pin" style="background:#1c6658" aria-label="Saved spot">★</span>',iconSize:[34,42],iconAnchor:[17,38]})}).bindPopup(popup));}
+ for(const spot of (mapMode==='spots'?savedSpotPins:[])){const popup=el('div');popup.append(el('strong','',spot.name),el('p','',(spot.status==='want'?'Want to try':'Fished')+' · '+spot.waterbody),el('p','',spot.access),el('p','',spot.launch));const marker=L.marker([spot.latitude,spot.longitude],{icon:L.divIcon({className:'df-location-icon',html:'<span class="df-map-pin '+(spot.status==='fished'?'df-pin-fished':'df-pin-want')+'" aria-hidden="true">★</span>',iconSize:[34,42],iconAnchor:[17,38],popupAnchor:[0,-32]})}).bindPopup(popup);markerByKey.set('spot:'+spot.id,marker);markers.addLayer(marker);}
+
  markers.addTo(map);
  // Never center on phone GPS, a hard-coded location, or (0,0) as a fallback.
- if(savedSpotPins.length)map.fitBounds(markers.getBounds().pad(.22),{maxZoom:14,animate:false});
+ if(mapMode==='spots'&&savedSpotPins.length)map.fitBounds(markers.getBounds().pad(.22),{maxZoom:14,animate:false});
  else if(groups.length===1)map.setView([groups[0].latitude,groups[0].longitude],13,{animate:false});
  else if(groups.length>1)map.fitBounds(markers.getBounds().pad(.22),{maxZoom:14,animate:false});
  invalidateMap();
@@ -158,13 +182,12 @@ async function loadMap(){
   if(!window.L)throw Error('Map library did not initialize');
   // Fetch the committed records before deciding where to create the map.
   await refresh();
-  const selected=window.DistrictFlatwaterMapUtils.groupPins(filteredLocations());
-  if(!selected.length&&!savedSpotPins.length){
+  const selected=activeLocations();
+  if(!selected.length){
     $('df-map-status').textContent='No saved GPS pins to plot. The map does not substitute the phone location.';
     b.disabled=false;b.textContent='Load interactive map';
     return;
   }
-  if(!selected.length)selected.push(savedSpotPins[0]);
   map=L.map('df-map',{scrollWheelZoom:false,zoomControl:true}).setView([selected[0].latitude,selected[0].longitude],13,{animate:false});
   let failures=0;
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'})
@@ -181,10 +204,13 @@ function init(){
  const main=document.querySelector('main');if(!main)return;
  const analytics=screen('analytics','Catch analytics','FISHING PATTERNS'),locations=screen('map','Fishing locations','YOUR WATER');
  const data=el('div');data.id='df-analytics-data';analytics.append(data);
- const mp=panel('Catch map');
+ const mp=panel('Catch map');mp.children[0].id='df-map-heading';
+ const toggle=el('div','df-map-toggle');toggle.setAttribute('role','group');toggle.setAttribute('aria-label','Map view');
+ for(const [value,label] of [['catches','Catch map'],['spots','Saved spots']]){const b=button('df-mode-'+value,label);b.setAttribute('aria-pressed',String(value==='catches'));b.onclick=()=>setMapMode(value);toggle.append(b);}mp.append(toggle);
+ const legend=el('p','df-spot-legend');legend.id='df-spot-legend';legend.hidden=true;legend.append(el('span','df-legend-fished','● Fished'),el('span','df-legend-want','● Want to try'));mp.append(legend);
  mp.append(el('p','df-privacy','Opening the Map tab loads map tiles when online. Tiles come from OpenStreetMap and can reveal the area shown to the provider. Your catch database and photos are not uploaded.'));
  const provenance=el('p','df-privacy');provenance.id='df-map-source-note';
- provenance.textContent='Catch pins use saved catch GPS; stars mark saved fishing spots. Catch filters apply to catch pins. Current phone GPS is never read from the Map screen.';
+ provenance.textContent='Catch pins use saved catch GPS. Switch to Saved spots to view planned and fished locations.';
  mp.append(provenance);
  mp.append(button('df-load-map','Load interactive map'));
  const m=el('div');m.id='df-map';mp.append(m);
@@ -209,7 +235,7 @@ function init(){
        if(map){invalidateMap();return;}
        // Opening Map is an explicit request to view map tiles and saved pins.
        // No live phone GPS is ever requested by this feature.
-       if(filteredLocations().length&&canLoadMap()&&!loadingMap)loadMap();
+       if(activeLocations().length&&canLoadMap()&&!loadingMap)loadMap();
      });
    }
  });
@@ -236,7 +262,7 @@ function init(){
    refresh().then(current=>{
      if(!current||$('screen-map').hidden)return;
      if(map){invalidateMap();return;}
-     if(filteredLocations().length&&canLoadMap()&&!loadingMap)loadMap();
+     if(activeLocations().length&&canLoadMap()&&!loadingMap)loadMap();
    });
  });
  window.addEventListener('focus',()=>{if(window.__DF_CATCH_APP_BOOT?.initialized)refresh();});
