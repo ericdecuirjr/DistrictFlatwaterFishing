@@ -52,12 +52,12 @@ const indexedDB={
  }
 };
 const spots=[];
-const calls={created:0,markers:0,center:null,fit:0,icons:[]};
+const calls={created:0,markers:0,center:null,fit:0,icons:[],viewport:[]};
 const leaflet={
  map(){calls.created++;return {
   setView(coords){calls.center=coords;return this;},
-  fitBounds(){calls.fit++;return this;},
-  removeLayer(){},invalidateSize(){},
+  fitBounds(){calls.fit++;calls.viewport.push('fit');return this;},
+  removeLayer(){},invalidateSize(){calls.viewport.push('size');},
  };},
  featureGroup(){const layer={pins:[],addLayer(pin){this.pins.push(pin);},
   addTo(){calls.markers=this.pins.length;return this;},
@@ -136,6 +136,19 @@ assert.ok(calls.icons.some(x=>x.includes('df-pin-fished')),'Fished pin uses gree
 assert.ok(calls.icons.some(x=>x.includes('df-pin-want')),'Want to try pin uses yellow class');
 assert.equal(registry.get('df-map-filters').hidden,true);
 assert.equal(registry.get('df-mode-spots')['aria-pressed'],'true');
+// Saving a spot happens on another screen: never fit a zero-sized hidden map.
+mapScreen.hidden=true;
+const fitBeforeHiddenSave=calls.fit;
+spots.push({id:'added',name:'Added while hidden',status:'want',latitude:38.9,longitude:-77.1});
+fakeDocument.dispatchEvent({type:'df-spots-changed'});await flush();
+assert.equal(calls.fit,fitBeforeHiddenSave,'Saving a spot must not fit the hidden map');
+mapScreen.hidden=false;calls.viewport=[];
+fakeDocument.dispatchEvent({type:'df-tab-change',detail:{name:'map'}});await flush();
+assert.equal(calls.markers,3,'New spot appears on returning to Map without retoggling');
+assert.ok(calls.fit>fitBeforeHiddenSave,'Returning to Map fits all saved spots');
+const fitIndex=calls.viewport.indexOf('fit');
+assert.ok(fitIndex>0&&calls.viewport[fitIndex-1]==='size','Refresh visible map size before fitting bounds');
+spots.pop();fakeDocument.dispatchEvent({type:'df-spots-changed'});await flush();
 spots[1].status='fished';calls.icons=[];
 fakeDocument.dispatchEvent({type:'df-spots-changed'});await flush();
 assert.ok(calls.icons.every(x=>x.includes('df-pin-fished')),'Status edit recolors pins immediately');

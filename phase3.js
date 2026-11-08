@@ -133,7 +133,7 @@ async function focusSavedPin(record){
 function addStyle(url){return new Promise((resolve,reject)=>{const tag=el('link');tag.rel='stylesheet';tag.href=url;tag.onload=resolve;tag.onerror=reject;document.head.append(tag);});}
 function addScript(url){return new Promise((resolve,reject)=>{const tag=el('script');tag.src=url;tag.onload=resolve;tag.onerror=reject;document.head.append(tag);});}
 function updateMarkers(){
- if(!map||!window.L)return;
+ if(!map||!window.L||$('screen-map').hidden)return;
  if(markers)map.removeLayer(markers);
  markers=L.featureGroup();markerByKey=new Map();
  const groups=mapMode==='catches'?window.DistrictFlatwaterMapUtils.groupPins(filteredLocations()):[];
@@ -157,11 +157,17 @@ function updateMarkers(){
  for(const spot of (mapMode==='spots'?savedSpotPins:[])){const popup=el('div');popup.append(el('strong','',spot.name),el('p','',(spot.status==='want'?'Want to try':'Fished')+' · '+spot.waterbody),el('p','',spot.access),el('p','',spot.launch));const marker=L.marker([spot.latitude,spot.longitude],{icon:L.divIcon({className:'df-location-icon',html:'<span class="df-map-pin '+(spot.status==='fished'?'df-pin-fished':'df-pin-want')+'" aria-hidden="true">★</span>',iconSize:[34,42],iconAnchor:[17,38],popupAnchor:[0,-32]})}).bindPopup(popup);markerByKey.set('spot:'+spot.id,marker);markers.addLayer(marker);}
 
  markers.addTo(map);
- // Never center on phone GPS, a hard-coded location, or (0,0) as a fallback.
- if(mapMode==='spots'&&savedSpotPins.length)map.fitBounds(markers.getBounds().pad(.22),{maxZoom:14,animate:false});
- else if(groups.length===1)map.setView([groups[0].latitude,groups[0].longitude],13,{animate:false});
- else if(groups.length>1)map.fitBounds(markers.getBounds().pad(.22),{maxZoom:14,animate:false});
- invalidateMap();
+ // Fit only after the visible container has completed layout. A hidden map
+ // has zero dimensions, which makes Leaflet choose a world-scale zoom.
+ const fittedMarkers=markers;
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  if(!map||$('screen-map').hidden||markers!==fittedMarkers)return;
+  map.invalidateSize({pan:false});
+  // Never center on phone GPS or a hard-coded fallback.
+  if(mapMode==='spots'&&savedSpotPins.length)map.fitBounds(markers.getBounds().pad(.22),{maxZoom:14,animate:false});
+  else if(groups.length===1)map.setView([groups[0].latitude,groups[0].longitude],13,{animate:false});
+  else if(groups.length>1)map.fitBounds(markers.getBounds().pad(.22),{maxZoom:14,animate:false});
+ }));
 }
 function invalidateMap(){
  if(!map)return;
@@ -223,7 +229,7 @@ function init(){
  const list=el('div','df-map-list');list.id='df-map-list';search.append(label,input);locations.append(search,list);
  const back=button('','← More','button secondary compact');analytics.children[0].append(back);back.addEventListener('click',()=>document.querySelector('#tab-more').click());
  main.insertBefore(analytics,$('screen-settings'));main.insertBefore(locations,$('screen-settings'));
- $('df-load-map').addEventListener('click',loadMap);document.addEventListener('df-spots-changed',()=>refresh().then(()=>{if(map)updateMarkers();}));
+ $('df-load-map').addEventListener('click',loadMap);document.addEventListener('df-spots-changed',refresh);
  input.addEventListener('input',renderLocations);
  for(const [id,title,type] of [['df-map-lure','Filter by bait / lure','text'],['df-map-spot','Filter by spot name','text'],['df-map-favorite','Favorite spots only','checkbox']]){const label=el('label','',title),control=el('input');control.id=id;control.type=type;label.htmlFor=id;search.append(label,control);control.addEventListener('input',renderLocations);}
  const reload=button('df-refresh-map','Refresh saved locations','button secondary compact');reload.addEventListener('click',refresh);search.append(reload);
