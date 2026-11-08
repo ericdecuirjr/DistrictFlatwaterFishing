@@ -1,7 +1,7 @@
 {
   "name": "district-flatwater-fishing-android",
   "private": true,
-  "version": "3.12.0",
+  "version": "3.13.0",
   "type": "module",
   "scripts": {
     "build:web": "node build-web.mjs"

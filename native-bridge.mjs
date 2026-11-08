@@ -7,13 +7,7 @@ import {Camera,MediaTypeSelection} from '@capacitor/camera';
 
 if(Capacitor.isNativePlatform()){
   const meaningfulError=e=>e?.message||e?.code||String(e);
-  window.DistrictFlatwaterNative={
-    isNative:true,
-    // Uses the system picker with an explicit request to share photo GPS.
-    // Android may still redact it if the user declines or the device lacks support.
-    async pickPhoto(source){
-      const OriginalPhoto = registerPlugin('DistrictPhotoImport');
-      const fromResult=async result=>{
+  const fromResult=async result=>{
         const path=result.fileUri?Capacitor.convertFileSrc(result.fileUri):result.webPath;
         if(!path)throw Error('Photo picker returned no readable image.');
         const res=await fetch(path);
@@ -31,6 +25,18 @@ if(Capacitor.isNativePlatform()){
         if(exif)file.nativeExif=exif;
         return file;
       };
+  window.DistrictFlatwaterNative={
+    isNative:true,
+    // Uses the system picker with an explicit request to share photo GPS.
+    // Android may still redact it if the user declines or the device lacks support.
+    async pickPhotos(){
+      const gallery=await Camera.chooseFromGallery({mediaType:MediaTypeSelection.Photo,allowMultipleSelection:true,limit:10,includeMetadata:true,editable:'no',quality:100});
+      if(!gallery.results?.length)return [];
+      if(gallery.results.length>10)throw Error('Select up to 10 photos per batch.');
+      return gallery.results.map((result,i)=>({name:'Selected photo '+(i+1),load:()=>fromResult(result)}));
+    },
+    async pickPhoto(source){
+      const OriginalPhoto = registerPlugin('DistrictPhotoImport');
       if(source==='camera'){
         return fromResult(await Camera.takePhoto({
           quality:100,includeMetadata:true,correctOrientation:true,
