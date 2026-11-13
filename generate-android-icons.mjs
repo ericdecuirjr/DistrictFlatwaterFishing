@@ -8,7 +8,7 @@ const root='android/app/src/main/res';
 const svg=readFileSync('branding-logo.svg','utf8');
 if(!svg.includes('District Flatwater Fishing'))throw Error('Expected fishing brand SVG not found.');
 const full=Buffer.from(svg);
-const noBackground=svg.replace(/<rect\s+width="384"\s+height="384"\s+fill="#00380e"\s*\/>/, '');
+const noBackground=svg.replace(/<rect\b[^>]*\bid="brand-background"[^>]*\/>/, '');
 if(noBackground===svg)throw Error('Could not isolate logo for adaptive foreground');
 const foreground=Buffer.from(noBackground);
 const densities={mdpi:48,hdpi:72,xhdpi:96,xxhdpi:144,xxxhdpi:192};
