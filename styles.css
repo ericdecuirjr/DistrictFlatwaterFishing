@@ -22,7 +22,7 @@
 .intro{display:grid;grid-template-columns:minmax(0,1fr) minmax(145px,240px);align-items:center;gap:18px;background:linear-gradient(125deg,#00380e 0%,#114b2b 58%,#073a20 100%)}
 .intro::after{content:none}
 .intro-copy{min-width:0;position:relative;z-index:1}
-.intro-emblem{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:contain;border-radius:50%;box-shadow:0 9px 30px #001b1033}
+.intro-emblem{display:block;width:100%;height:auto;aspect-ratio:1/1;object-fit:contain;border-radius:12%;box-shadow:0 9px 30px #001b1033}
 .intro .eyebrow{color:#e9d9a2}
 .intro h1 em{color:#f3d18b}
 @media(max-width:700px){
