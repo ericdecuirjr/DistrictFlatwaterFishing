@@ -9,8 +9,8 @@ const write=record=>new Promise((r,j)=>{const tx=db.transaction('catches','readw
 const getAll=()=>new Promise(r=>{const q=db.transaction('catches').objectStore('catches').getAll();q.onsuccess=()=>r(q.result);});
 const source=readFileSync('app.js','utf8');
 const messages=[];let confirmed=true;
-const context=vm.createContext({db,STORE:'catches',TRIPS:'trips',SPOTS:'spots',Event:class{},renderTrips:async()=>{},$,getAll,Blob,Uint8Array,atob,confirm:()=>confirmed,notify:(...m)=>messages.push(m),refreshStats:async()=>{},tab:()=>{},document:{dispatchEvent(){}},CustomEvent:class{}});
-vm.runInContext(source.slice(source.indexOf('function validateSpot'),source.indexOf('let spotEditingId')),context);
+const context=vm.createContext({db,URL,STORE:'catches',TRIPS:'trips',SPOTS:'spots',Event:class{},renderTrips:async()=>{},$,getAll,Blob,Uint8Array,atob,confirm:()=>confirmed,notify:(...m)=>messages.push(m),refreshStats:async()=>{},tab:()=>{},document:{dispatchEvent(){}},CustomEvent:class{}});
+vm.runInContext(source.slice(source.indexOf('function validSpotCoordinates'),source.indexOf('let spotEditingId')),context);
 vm.runInContext(source.slice(source.indexOf('function dataUrlToBlob'),source.indexOf('async function storageHealth')),context);
 const row=(id,species='Bass')=>({id,species,capturedAt:'2026-01-01T12:00:00Z',photoDataUrl:'data:image/png;base64,aGVsbG8=',latitude:0,longitude:0,spotName:'Cove',favoriteSpot:true,photoMeasurement:{estimated:true}});
 const restore=rows=>context.importBackup({size:100,text:async()=>JSON.stringify({application:'district-flatwater-fishing',formatVersion:1,catches:rows})});
@@ -34,6 +34,22 @@ assert.equal(locs([row('a')],'',{spot:'unknown'}).length,0);
 await context.importBackup({size:100,text:async()=>JSON.stringify({application:'district-flatwater-fishing',formatVersion:1,catches:[],trips:[{id:'restored-trip',name:'Restored',startedAt:'2026-01-01T12:00:00Z',endedAt:null}]})});
 const trips=await new Promise(r=>{const q=db.transaction('trips').objectStore('trips').getAll();q.onsuccess=()=>r(q.result);});assert.equal(trips.length,1);assert.ok(trips[0].endedAt,'restored trips cannot silently become active');
 await context.importBackup({size:100,text:async()=>JSON.stringify({application:'district-flatwater-fishing',formatVersion:1,catches:[row('must-not-save')],spots:[{id:'bad'}]})});assert.ok(!(await getAll()).some(c=>c.id==='must-not-save'));
-await context.importBackup({size:100,text:async()=>JSON.stringify({application:'district-flatwater-fishing',formatVersion:1,catches:[],spots:[{id:'spot',name:'Launch',waterbody:'Lake',status:'want',access:'Trail',launch:'Ramp',latitude:39,longitude:-77}]})});
-const spots=await new Promise(r=>{const q=db.transaction('spots').objectStore('spots').getAll();q.onsuccess=()=>r(q.result);});assert.equal(spots.length,1);assert.equal(spots[0].launch,'Ramp');
-console.log('Full validation, cancel, duplicate IDs, conflict preservation, repeat restore, atomic rollback and spot filters passed');
+const legacySpot={id:'spot',name:'Launch',waterbody:'Lake',status:'want',access:'Trail',launch:'Ramp',latitude:39,longitude:-77};
+const plannedSpot={...legacySpot,id:'planned',plan:{
+ trailhead:'North parking',latitude:39.1,longitude:-77.2,hikeMiles:2.5,
+ gaugeUrl:'https://waterdata.usgs.gov/example',regulationsUrl:'https://dwr.virginia.gov/fishing/regulations/'
+}};
+const restoreSpots=(spots,catches=[])=>context.importBackup({size:100,text:async()=>JSON.stringify({
+ application:'district-flatwater-fishing',formatVersion:1,catches,spots
+})});
+const getSpots=()=>new Promise(r=>{const q=db.transaction('spots').objectStore('spots').getAll();q.onsuccess=()=>r(q.result);});
+await restoreSpots([legacySpot,plannedSpot]);
+let spots=await getSpots();
+assert.deepEqual(spots.find(s=>s.id==='spot'),legacySpot,'Older backups restore without a trip plan');
+assert.deepEqual(spots.find(s=>s.id==='planned'),plannedSpot,'Trip planning fields survive restore');
+await restoreSpots([{...plannedSpot,plan:{...plannedSpot.plan,hikeMiles:3}}]);
+assert.deepEqual((await getSpots()).find(s=>s.id==='planned'),plannedSpot,'Restore keeps the plan already on the device');
+await restoreSpots([{...plannedSpot,id:'unsafe',plan:{...plannedSpot.plan,gaugeUrl:'javascript:alert(1)'}}],[row('unsafe-catch')]);
+assert.equal((await getSpots()).length,2,'Unsafe imported links reject the entire restore');
+assert.ok(!(await getAll()).some(c=>c.id==='unsafe-catch'));
+console.log('Validation, cancellation, conflicts, repeat restore, atomic rollback, legacy spots and trip plans passed');
