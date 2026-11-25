@@ -29,9 +29,27 @@ try {
  const assert=(v,m)=>{if(!v)throw Error(m);};
  await click('#tab-more');await click('[data-tab=spots]');await wait("!document.querySelector('#screen-spots').hidden");
  await fill('#spot-title','Lake launch');await fill('#spot-waterbody','Sleeter Lake');await fill('#spot-access','Public access');await fill('#spot-launch','Carry kayak to water');await fill('#spot-lat','39.1');await fill('#spot-lon','-77.7');await click('#spot-save');await wait("document.querySelector('#saved-spots-list').textContent.includes('Lake launch')");
- await click('#saved-spots-list button');await fill('#spot-status','fished');await click('#spot-save');await wait("document.querySelector('#saved-spots-list').textContent.includes('Fished')");
+ await click('#saved-spots-list button');
+ await click('#spot-plan summary');
+ await fill('#spot-trailhead','North parking');await fill('#spot-trailhead-lat','39.2');
+ await click('#spot-save');await wait("document.querySelector('#toast').textContent.includes('Trailhead: Enter both')");
+ await fill('#spot-trailhead-lon','-77.8');await fill('#spot-hike','2.5');
+ await fill('#spot-gauge-url','https://waterdata.usgs.gov/example');
+ await fill('#spot-regulations-url','https://dwr.virginia.gov/fishing/regulations/');
+ await fill('#spot-status','fished');await click('#spot-save');
+ await wait("document.querySelector('#saved-spots-list').textContent.includes('Fished')");
  await send('Page.reload');await wait('window.__DF_CATCH_APP_BOOT?.initialized');await wait("!document.querySelector('#df-launch-splash')");await click('#tab-more');await click('[data-tab=spots]');await wait("document.querySelector('#saved-spots-list').textContent.includes('Carry kayak')");
- assert(await evaluate("document.querySelector('#saved-spots-list').textContent.includes('Fished')"),'Saved spot survives reopen');console.log('Saved spot creation, editing and persistence passed');
+ assert(await evaluate("document.querySelector('#saved-spots-list').textContent.includes('Fished')"),'Saved spot survives reopen');
+ assert(await evaluate(`(() => {
+  const list=document.querySelector('#saved-spots-list');
+  const links=Object.fromEntries([...list.querySelectorAll('a')].map(a=>[a.textContent,a.href]));
+  return list.textContent.includes('North parking') && list.textContent.includes('2.5 miles') &&
+   new URL(links['Fishing spot in Maps']).searchParams.get('query')==='39.1,-77.7' &&
+   new URL(links['Trailhead in Maps']).searchParams.get('query')==='39.2,-77.8' &&
+   links['Stream gauge']==='https://waterdata.usgs.gov/example' &&
+   links['Fishing regulations']==='https://dwr.virginia.gov/fishing/regulations/';
+ })()`),'Trip plan details and separate fishing and trailhead coordinates survive reload');
+ console.log('Saved spot editing and trip planning persistence passed');
  // Seed an older database before upgrade, then reload the app.
  await evaluate(`new Promise((resolve,reject)=>{const r=indexedDB.open('district-flatwater-catches-v1');r.onsuccess=()=>{const d=r.result,tx=d.transaction('catches','readwrite');tx.objectStore('catches').put({id:'legacy',species:'Bluegill',capturedAt:new Date().toISOString(),photo:new Blob(['old'],{type:'image/png'}),notes:'preserve me'});tx.oncomplete=()=>{d.close();resolve()};tx.onerror=reject;};})`);
  await click('#tab-log');await fill('#trip-name','Sleeter Lake morning');await click('#start-trip');await wait("document.querySelector('#trip-status').textContent.includes('Sleeter')");

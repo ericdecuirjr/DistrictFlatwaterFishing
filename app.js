@@ -2,10 +2,10 @@
 (function districtFlatwaterCatchApp(){
 'use strict';
 if(window.__DF_CATCH_APP_BOOT) return;
-window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.14.1'};
+window.__DF_CATCH_APP_BOOT={initialized:false,version:'3.15.0'};
 /* District Flatwater Fishing — Phase 1. No frameworks or tracking. */
 'use strict';
-const VERSION = '3.14.1';
+const VERSION = '3.15.0';
 const DB_NAME = 'district-flatwater-catches-v1';
 const STORE = 'catches';
 const TRIPS = 'trips';
@@ -77,31 +77,131 @@ function putCatch(record){return new Promise((resolve,reject)=>{const tx=db.tran
 function removeCatch(id){return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});}
 function spotRows(){return new Promise((resolve,reject)=>{const r=db.transaction(SPOTS).objectStore(SPOTS).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 function writeSpot(record,remove=false){return new Promise((resolve,reject)=>{const tx=db.transaction(SPOTS,'readwrite'),store=tx.objectStore(SPOTS);if(remove)store.delete(record.id);else store.put(record);tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);tx.onerror=()=>{};});}
+const spotFields = {
+ name:'spot-title', waterbody:'spot-waterbody', access:'spot-access', launch:'spot-launch',
+ latitude:'spot-lat', longitude:'spot-lon', status:'spot-status'
+};
+const spotPlanFields = {
+ trailhead:'spot-trailhead', latitude:'spot-trailhead-lat', longitude:'spot-trailhead-lon',
+ hikeMiles:'spot-hike', gaugeUrl:'spot-gauge-url', regulationsUrl:'spot-regulations-url'
+};
+
+function validSpotCoordinates(latitude,longitude){
+ return (latitude===null&&longitude===null)||
+  (Number.isFinite(latitude)&&Math.abs(latitude)<=90&&Number.isFinite(longitude)&&Math.abs(longitude)<=180);
+}
+
+function spotLinkUrl(value,label){
+ if(value==='')return '';
+ let url;
+ try{url=new URL(value);}catch{}
+ if(typeof value!=='string'||!/^https?:\/\//i.test(value)||!url||url.href.length>2048||url.username||url.password){
+  throw Error(label+' must be a valid web link starting with https:// or http://.');
+ }
+ return url.href;
+}
+
 function validateSpot(s){
  if(!s||typeof s.id!=='string'||!s.id||typeof s.name!=='string'||!s.name.trim()||s.name.length>100||!['want','fished'].includes(s.status))throw Error('Invalid saved spot');
  for(const [k,max] of [['waterbody',100],['access',1500],['launch',1500]])if(typeof s[k]!=='string'||s[k].length>max)throw Error('Invalid spot notes');
- const noGps=s.latitude===null&&s.longitude===null;
- if(!noGps&&(!Number.isFinite(s.latitude)||Math.abs(s.latitude)>90||!Number.isFinite(s.longitude)||Math.abs(s.longitude)>180))throw Error('Invalid spot coordinates');
+ if(!validSpotCoordinates(s.latitude,s.longitude))throw Error('Invalid spot coordinates');
+ const plan=s.plan;
+ if(plan!=null){
+  if(typeof plan!=='object'||typeof plan.trailhead!=='string'||plan.trailhead.length>100)throw Error('Invalid trailhead name.');
+  if(!validSpotCoordinates(plan.latitude,plan.longitude))throw Error('Invalid trailhead coordinates.');
+  if(plan.hikeMiles!==null&&(!Number.isFinite(plan.hikeMiles)||plan.hikeMiles<0))throw Error('Enter a one-way hike distance of zero or more miles.');
+  spotLinkUrl(plan.gaugeUrl,'Stream gauge link');
+  spotLinkUrl(plan.regulationsUrl,'Fishing regulations link');
+ }
  return s;
 }
+
 let spotEditingId=null;
-function clearSpot(){spotEditingId=null;for(const id of ['spot-title','spot-waterbody','spot-access','spot-launch','spot-lat','spot-lon'])$(id).value='';$('spot-status').value='want';$('spot-save').textContent='Save spot';}
+function fillSpot(spot={}){
+ for(const [key,id] of Object.entries(spotFields))$(id).value=spot[key]??(key==='status'?'want':'');
+ for(const [key,id] of Object.entries(spotPlanFields))$(id).value=spot.plan?.[key]??'';
+ $('spot-plan').open=Boolean(spot.plan);
+ $('spot-save').textContent=spotEditingId?'Update spot':'Save spot';
+}
+function clearSpot(){spotEditingId=null;fillSpot();}
+
+function spotMapUrl(latitude,longitude){
+ return Number.isFinite(latitude)?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(latitude+','+longitude):'';
+}
+
+function appendSpotLink(parent,label,url){
+ if(!url)return;
+ const link=node('a','button ghost compact',label);
+ link.href=url;link.target='_blank';link.rel='noopener noreferrer';
+ parent.append(link);
+}
+
 async function renderSpots(){
  const rows=await spotRows(),host=$('saved-spots-list');host.replaceChildren();
  const query=$('spot-search').value.trim().toLowerCase();
  if(!rows.length)host.append(node('p',null,'Save a place you want to try—even before your first catch.'));
- for(const spot of rows.filter(s=>[s.name,s.waterbody,s.access,s.launch].join(' ').toLowerCase().includes(query)).sort((a,b)=>a.name.localeCompare(b.name))){
- const card=node('div','panel');card.append(node('h3',null,spot.name));appendInfo(card,'Waterbody',spot.waterbody);appendInfo(card,'Status',spot.status==='want'?'Want to try':'Fished');appendInfo(card,'Access notes',spot.access);appendInfo(card,'Kayak launch',spot.launch);
- if(Number.isFinite(spot.latitude)){const a=node('a','button ghost compact','Open location');a.href='https://www.google.com/maps?q='+encodeURIComponent(spot.latitude+','+spot.longitude);a.target='_blank';a.rel='noopener noreferrer';card.append(a);}
- const edit=node('button','button secondary compact','Edit spot');edit.type='button';edit.onclick=()=>{spotEditingId=spot.id;for(const [id,key] of [['spot-title','name'],['spot-waterbody','waterbody'],['spot-access','access'],['spot-launch','launch'],['spot-lat','latitude'],['spot-lon','longitude'],['spot-status','status']])$(id).value=spot[key]??'';$('spot-save').textContent='Update spot';$('spot-title').focus();};
- const remove=node('button','button ghost compact','Delete spot');remove.type='button';remove.onclick=async()=>{if(!confirm('Delete '+spot.name+'? Your catches and trips will stay saved.'))return;try{await writeSpot(spot,true);if(spotEditingId===spot.id)clearSpot();await renderSpots();document.dispatchEvent(new Event('df-spots-changed'));}catch(e){notify('Could not delete spot: '+e.message,true);}};card.append(edit,remove);host.append(card);
+ for(const spot of rows.filter(s=>[s.name,s.waterbody,s.access,s.launch,s.plan?.trailhead].join(' ').toLowerCase().includes(query)).sort((a,b)=>a.name.localeCompare(b.name))){
+  const card=node('div','panel');card.append(node('h3',null,spot.name));
+  appendInfo(card,'Waterbody',spot.waterbody);
+  appendInfo(card,'Status',spot.status==='want'?'Want to try':'Fished');
+  appendInfo(card,'Access notes',spot.access);
+  appendInfo(card,'Kayak launch',spot.launch);
+  const plan=spot.plan;
+  if(plan){
+   appendInfo(card,'Trailhead',plan.trailhead);
+   if(Number.isFinite(plan.latitude))appendInfo(card,'Trailhead GPS',plan.latitude+', '+plan.longitude);
+   if(plan.hikeMiles!==null)appendInfo(card,'One-way hike',plan.hikeMiles+(plan.hikeMiles===1?' mile':' miles'));
+  }
+  const links=node('div','photo-buttons');
+  appendSpotLink(links,'Fishing spot in Maps',spotMapUrl(spot.latitude,spot.longitude));
+  if(plan){
+   appendSpotLink(links,'Trailhead in Maps',spotMapUrl(plan.latitude,plan.longitude));
+   appendSpotLink(links,'Stream gauge',plan.gaugeUrl);
+   appendSpotLink(links,'Fishing regulations',plan.regulationsUrl);
+  }
+  if(links.childElementCount)card.append(links);
+  const actions=node('div','photo-buttons');
+  const edit=node('button','button secondary compact','Edit spot');edit.type='button';
+  edit.onclick=()=>{spotEditingId=spot.id;fillSpot(spot);$('spot-title').focus();};
+  const remove=node('button','button ghost compact','Delete spot');remove.type='button';
+  remove.onclick=async()=>{if(!confirm('Delete '+spot.name+'? Your catches and trips will stay saved.'))return;try{await writeSpot(spot,true);if(spotEditingId===spot.id)clearSpot();await renderSpots();document.dispatchEvent(new Event('df-spots-changed'));}catch(e){notify('Could not delete spot: '+e.message,true);}};
+  actions.append(edit,remove);card.append(actions);host.append(card);
  }
 }
+
+function readSpotCoordinates(latitude,longitude,label){
+ if(!latitude&&!longitude)return {latitude:null,longitude:null};
+ try{return window.DistrictFlatwaterCoordinates.parse(latitude,longitude);}
+ catch(e){throw Error(label+': '+e.message);}
+}
+
 async function saveSpot(){
- const b=$('spot-save');if(b.disabled)return;b.disabled=true;
- try{let coords={latitude:null,longitude:null};if($('spot-lat').value.trim()||$('spot-lon').value.trim())coords=window.DistrictFlatwaterCoordinates.parse($('spot-lat').value,$('spot-lon').value);
- const record=validateSpot({id:spotEditingId||crypto.randomUUID(),name:$('spot-title').value.trim(),waterbody:$('spot-waterbody').value.trim(),status:$('spot-status').value,access:$('spot-access').value.trim(),launch:$('spot-launch').value.trim(),...coords,updatedAt:new Date().toISOString()});
- await writeSpot(record);clearSpot();await renderSpots();document.dispatchEvent(new Event('df-spots-changed'));notify('Fishing spot saved.');}catch(e){notify(e.message,true);}finally{b.disabled=false;}
+ const button=$('spot-save');if(button.disabled)return;button.disabled=true;
+ try{
+  const fields=Object.fromEntries(Object.entries(spotFields).map(([key,id])=>[key,$(id).value.trim()]));
+  const planFields=Object.fromEntries(Object.entries(spotPlanFields).map(([key,id])=>[key,$(id).value.trim()]));
+  const coords=readSpotCoordinates(fields.latitude,fields.longitude,'Fishing spot');
+  let plan;
+  if(Object.values(planFields).some(Boolean)||$('spot-hike').validity.badInput){
+   if($('spot-hike').validity.badInput)throw Error('Enter a one-way hike distance in miles.');
+   plan={
+    trailhead:planFields.trailhead,
+    ...readSpotCoordinates(planFields.latitude,planFields.longitude,'Trailhead'),
+    hikeMiles:planFields.hikeMiles===''?null:Number(planFields.hikeMiles),
+    gaugeUrl:spotLinkUrl(planFields.gaugeUrl,'Stream gauge link'),
+    regulationsUrl:spotLinkUrl(planFields.regulationsUrl,'Fishing regulations link')
+   };
+  }
+  const record=validateSpot({
+   id:spotEditingId||crypto.randomUUID(),...fields,...coords,
+   ...(plan?{plan}:{}),updatedAt:new Date().toISOString()
+  });
+  await writeSpot(record);
+  clearSpot();
+  await renderSpots();
+  document.dispatchEvent(new Event('df-spots-changed'));
+  notify('Fishing spot saved.');
+ }catch(e){notify(e.message,true);}finally{button.disabled=false;}
 }
 function tripRows(){return new Promise((resolve,reject)=>{const r=db.transaction(TRIPS).objectStore(TRIPS).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});}
 function putTrip(record){return new Promise((resolve,reject)=>{const tx=db.transaction(TRIPS,'readwrite');tx.objectStore(TRIPS).put(record);tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);tx.onerror=()=>{};});}
